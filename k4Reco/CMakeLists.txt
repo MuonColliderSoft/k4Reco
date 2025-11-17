@@ -27,6 +27,7 @@ set(sources
   CaloDigi/src/RealisticCaloRecoSilicon.cc
   CaloDigi/src/RealisticCaloDigi.cc
   CaloDigi/src/RealisticCaloReco.cc
+  Muons/src/MuonIdentification.cpp
 )
 
 set(libs
@@ -116,6 +117,7 @@ set(k4RecoPlugins_public_includes
 
 target_include_directories(k4RecoPlugins PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/CaloDigi/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/Muons/include>
   ${k4RecoPlugins_public_includes})
 
 if(BUILD_TRACKING)
