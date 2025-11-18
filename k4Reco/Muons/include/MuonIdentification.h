@@ -5,7 +5,7 @@
 #include "k4FWCore/Transformer.h"
 #include "k4Interface/IGeoSvc.h"
 
-#include <edm4hep/TrackerHitPlaneCollection.h>
+#include <edm4hep/TrackCollection.h>
 #include <edm4hep/CalorimeterHitCollection.h>
 #include <edm4hep/ReconstructedParticleCollection.h>
 
@@ -14,7 +14,7 @@
 #include "TH2F.h"
 
 using TransformType = edm4hep::ReconstructedParticleCollection(
-                        const edm4hep::TrackerHitPlaneCollection&,
+                        const edm4hep::TrackCollection&,
                         const edm4hep::CalorimeterHitCollection&
                       );
 
@@ -26,7 +26,7 @@ public:
 
   StatusCode initialize() override;
   edm4hep::ReconstructedParticleCollection operator()(
-    const edm4hep::TrackerHitPlaneCollection& trackerHitCollection,
+    const edm4hep::TrackCollection& trackCollection,
     const edm4hep::CalorimeterHitCollection& muonHitCollection
   ) const override;
   StatusCode finalize() override;
@@ -48,6 +48,9 @@ protected:
   Gaudi::Property<int> m_nHitsMatch { this, "NHitsMatch", 4, "Minumum number of matching hits in the muon detector" };
   Gaudi::Property<bool> m_fillHistos { this, "FillHistograms", false, "Fill the diagnostic histograms" };
 
+  Gaudi::Property<std::string> m_encodingStringVariable { this, "EncodingStringParameterName",
+                            "GlobalTrackerReadoutID",
+                            "The name of the DD4hep constant that contains the Encoding string for tracking detectors"};
   Gaudi::Property<std::string> m_formulaStr { this, "TrackTofCorrFunction",
                                              "(x < 0.5735 || x > 2.57) ? 0.015058 : "
                                              "(x >= 0.5735 && x < 0.626) ? (-9.63278 + 16.8561*x) : "
@@ -60,11 +63,15 @@ private:
   SmartIF<IGeoSvc>   m_geoSvc;
   SmartIF<ITHistSvc> m_histSvc;
 
-  unsigned int _muonDetBarrel;
-  unsigned int _muonDetEndcap;
-  float _bField = 5.;
+  unsigned int m_muonDetBarrel;
+  unsigned int m_muonDetEndcap;
 
-  TFormula* _tof_correction = nullptr;
+  float m_ecalB_inner_r;
+  float m_ecalE_min_z;
+
+  float m_bField = 5.;
+
+  TFormula* m_tof_correction = nullptr;
 };
 
 DECLARE_COMPONENT(MuonIdentification)
