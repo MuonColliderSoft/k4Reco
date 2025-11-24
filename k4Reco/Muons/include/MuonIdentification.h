@@ -10,8 +10,6 @@
 #include <edm4hep/ReconstructedParticleCollection.h>
 
 #include "TFormula.h"
-#include "TH1F.h"
-#include "TH2F.h"
 
 using TransformType = edm4hep::ReconstructedParticleCollection(
                         const edm4hep::TrackCollection&,
@@ -43,7 +41,7 @@ protected:
                                    "DeltaR for matching tracks with muon detector hits in barrel and endcaps" };
   Gaudi::Property<std::vector<float>> m_timeWindowB { this, "BarrelHitsTimeWindow", { -0.3, 0.3 }, 
                                    "Time window for hits in the muon detecor barrel in ns" };
-  Gaudi::Property<std::vector<float>> _timeWindowE { this, "EndcapHitsTimeWindow", { -0.3, 0.3 },
+  Gaudi::Property<std::vector<float>> m_timeWindowE { this, "EndcapHitsTimeWindow", { -0.3, 0.3 },
                                    "Time window for hits in the muon detecor endcaps in ns" };
   Gaudi::Property<int> m_nHitsMatch { this, "NHitsMatch", 4, "Minumum number of matching hits in the muon detector" };
   Gaudi::Property<bool> m_fillHistos { this, "FillHistograms", false, "Fill the diagnostic histograms" };
@@ -58,6 +56,10 @@ protected:
                                              "3.42931*x*x - 1.3498*x*x*x + 0.216549*x*x*x*x) : "
                                              "(x >= 2.516 && x < 2.57) ? (43.5031 - 16.9276*x) : 0",
                                              "Correction function for the track time of flight" };
+
+  static constexpr float m_lightSpeed = 299.792458; // [mm/ns]
+  static constexpr float m_muonMass = 0.1056583745; // [GeV]
+  static constexpr int m_muonPDG = 13;
 
 private:
   SmartIF<IGeoSvc>   m_geoSvc;

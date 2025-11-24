@@ -1,10 +1,13 @@
 #include "MuonIdentification.h"
 #include "DD4hep/Detector.h"
 
+#include "edm4hep/MutableReconstructedParticle.h"
 #include "Objects/Helix.h"
 #include "Pandora/Pandora.h"
 
 #include "math.h"
+
+#include "GaudiKernel/RndmGenerators.h"
 
 MuonIdentification::MuonIdentification(const std::string& name, ISvcLocator* svcLoc) :
   Transformer(name, svcLoc,
@@ -62,6 +65,8 @@ edm4hep::ReconstructedParticleCollection MuonIdentification::operator()(
 {
   edm4hep::ReconstructedParticleCollection result;
 
+  Rndm::Numbers gauss { randSvc(), Rndm::Gauss(0.0, m_timeResolution) };
+
   std::string initString = m_geoSvc->constantAsString(m_encodingStringVariable.value());
   dd4hep::DDSegmentation::BitFieldCoder bitFieldCoder(initString);  // check!
 
@@ -72,7 +77,7 @@ edm4hep::ReconstructedParticleCollection MuonIdentification::operator()(
     edm4hep::TrackState ts_atIP = track.getTrackStates(edm4hep::TrackState::AtIP);
     edm4hep::TrackState ts_atCAL = track.getTrackStates(edm4hep::TrackState::AtCalorimeter);
 
-    const float trk_pt = 0.000299792458 * m_bField / std::fabs(ts_atIP.omega);
+    const float trk_pt = (m_lightSpeed / 1000000) * m_bField / std::fabs(ts_atIP.omega);
     const float trk_cotTheta = ts_atIP.tanLambda;
     const float trk_phi = ts_atIP.phi;
     const float trk_theta = M_PI_2 - std::atan(trk_cotTheta);
@@ -128,15 +133,77 @@ edm4hep::ReconstructedParticleCollection MuonIdentification::operator()(
     }
 
     // --- Loop over the muon detector hits
+    int n_matchedHits = 0;
     for(size_t idx2 = 0; idx2 < muonHitCollection.size(); idx2++)
     {
       edm4hep::CalorimeterHit cHit = muonHitCollection.at(idx2);
       unsigned int systemID = bitFieldCoder.get(cHit.getCellID(), "system");
       unsigned int layerID  = bitFieldCoder.get(cHit.getCellID(), "layer");
+
+      float x_centered = cHit.getPosition()[0] - x_ecal;
+      float y_centered = cHit.getPosition()[1] - y_ecal;
+      float z_centered = cHit.getPosition()[2] - z_ecal;
+
+      float hit_r = std::sqrt(std::pow(x_centered, 2) + std::pow(y_centered, 2));
+      float hit_phi = std::atan2(y_centered, x_centered); 
+      float hit_theta = std::atan2(hit_r, z_centered);
+
+      float dphi = hit_phi - trk_phi;
+      if (dphi > M_PI) dphi -= 2. * M_PI;
+      if (dphi < -M_PI) dphi += 2. * M_PI;
+      float dtheta = hit_theta - trk_theta;
+
+      float deltaR = std::sqrt(std::pow(dphi, 2) + std::pow(dtheta, 2));
+      if (deltaR < m_deltaRMatch.value()[systemID - m_muonDetBarrel])
+      {
+        // --- Calculate the particle total time of flight to the muon detector hit
+        float dist = std::sqrt(std::pow(x_centered, 2) + std::pow(y_centered, 2) + std::pow(z_centered, 2));
+        float trk_p = trk_pt / sin(trk_theta);
+        float trk_E = sqrt(std::pow(trk_p, 2) + std::pow(m_muonMass, 2));
+
+        float beta = trk_p / trk_E;
+        float tof = (trk_length + dist) / (beta * m_lightSpeed) + tof_correction;
+
+        float deltaT = cHit.getTime() + gauss() - tof;
+
+        // Time window selection: use barrel or endcap window depending on system
+        if (systemID == m_muonDetBarrel)
+        {
+          if (deltaT < m_timeWindowB[0] || deltaT > m_timeWindowB[1]) continue;
+        }
+        else if (systemID == m_muonDetEndcap)
+        {
+          if (deltaT < m_timeWindowE[0] || deltaT > m_timeWindowE[1]) continue;
+        }
+
+        n_matchedHits++;
+      }
+    }
+
+    if (n_matchedHits >= m_nHitsMatch)
+    {
+      const float charge = ts_atIP.omega > 0.0 ? 1.0 : -1.0;
+      const int pdg = charge < 0. ? m_muonPDG : -1 * m_muonPDG; 
+      const float mom[3] = { 
+        trk_pt * std::cos(ts_atIP.phi),
+	      trk_pt * std::sin(ts_atIP.phi),
+	      trk_pt * trk_cotTheta
+      };
+      float energy = std::pow(mom[0], 2) + std::pow(mom[1], 2) + std::pow(mom[2], 2);
+      energy = std::sqrt(energy + std::pow(m_muonMass, 2));
+
+      edm4hep::MutableReconstructedParticle muon;
+      muon.setMomentum(mom);
+      muon.setEnergy(energy);
+      muon.setMass(m_muonMass);
+      muon.setCharge(charge);
+      muon.setPDG(pdg);
+      muon.addToTracks(track);
+
+      result.push_back(muon);
     }
   }
 
   return result;
 }
-
 
