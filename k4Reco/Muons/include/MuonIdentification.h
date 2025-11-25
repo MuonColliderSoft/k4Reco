@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Gaudi/Property.h"
-#include "GaudiKernel/ITHistSvc.h"
 #include "k4FWCore/Transformer.h"
 #include "k4Interface/IGeoSvc.h"
 
@@ -10,7 +9,51 @@
 #include <edm4hep/ReconstructedParticleCollection.h>
 
 #include "TFormula.h"
+#include "AIDA/IHistogram1D.h"
+#include "AIDA/IHistogram2D.h"
 
+#include <vector>
+
+struct MuonIdentification;
+
+/* ****************************************************************************
+ *  Friend class for handling histograms
+ * **************************************************************************** */
+
+class MuonIDHistograms
+{
+public:
+  MuonIDHistograms(const MuonIdentification& muon_algo) : m_algorithm(muon_algo) {};
+  virtual ~MuonIDHistograms() {};
+  void initialize();
+  void fillDeltaR(unsigned int system, unsigned int layer, float deltaR, float trk_pt, float trk_theta);
+  void fillDeltaT(unsigned int system, unsigned int layer, float deltaT, float trk_pt, float trk_theta);
+  void fillMatched(int num);
+
+private:
+  const MuonIdentification& m_algorithm;
+
+  AIDA::IHistogram1D* m_hDeltaR_Barrel = nullptr;
+  AIDA::IHistogram1D* m_hDeltaR_Endcap = nullptr;
+  AIDA::IHistogram1D* m_hDeltaT_Barrel = nullptr;
+  AIDA::IHistogram1D* m_hDeltaT_Endcap = nullptr;
+
+  std::vector<AIDA::IHistogram1D*> m_hDeltaR_B;
+  std::vector<AIDA::IHistogram1D*> m_hDeltaT_B;
+  std::vector<AIDA::IHistogram1D*> m_hDeltaR_E;
+  std::vector<AIDA::IHistogram1D*> m_hDeltaT_E;
+
+  AIDA::IHistogram2D* m_hDeltaR_vs_Pt = nullptr;
+  AIDA::IHistogram2D* m_hDeltaT_vs_Pt = nullptr;
+  AIDA::IHistogram2D* m_hDeltaR_vs_Theta = nullptr;
+  AIDA::IHistogram2D* m_hDeltaT_vs_Theta = nullptr;
+
+  AIDA::IHistogram1D* m_hNhits = nullptr;
+};
+
+/* ****************************************************************************
+ *  Gaudi algorithm for Muon Identification
+ * **************************************************************************** */
 using TransformType = edm4hep::ReconstructedParticleCollection(
                         const edm4hep::TrackCollection&,
                         const edm4hep::CalorimeterHitCollection&
@@ -19,6 +62,7 @@ using TransformType = edm4hep::ReconstructedParticleCollection(
 struct MuonIdentification : public k4FWCore::Transformer<TransformType>
 {
 public:
+  friend class MuonIDHistograms;
 
   MuonIdentification(const std::string& name, ISvcLocator* svcLoc);
 
@@ -61,9 +105,12 @@ protected:
   static constexpr float m_muonMass = 0.1056583745; // [GeV]
   static constexpr int m_muonPDG = 13;
 
+  static constexpr unsigned int m_muonDetBarrelLayers = 7;  // TODO read layer number from geometry
+  static constexpr unsigned int m_muonDetEndcapLayers = 6;
+
 private:
+  mutable MuonIDHistograms m_histos;
   SmartIF<IGeoSvc>   m_geoSvc;
-  SmartIF<ITHistSvc> m_histSvc;
 
   unsigned int m_muonDetBarrel;
   unsigned int m_muonDetEndcap;

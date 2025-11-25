@@ -6,8 +6,13 @@
 #include "Pandora/Pandora.h"
 
 #include "math.h"
+#include <format>
 
 #include "GaudiKernel/RndmGenerators.h"
+
+/* ****************************************************************************
+ *  Gaudi algorithm for Muon Identification
+ * **************************************************************************** */
 
 MuonIdentification::MuonIdentification(const std::string& name, ISvcLocator* svcLoc) :
   Transformer(name, svcLoc,
@@ -16,7 +21,8 @@ MuonIdentification::MuonIdentification(const std::string& name, ISvcLocator* svc
       KeyValues("InputMuonHitCollection", { "MuonHits" })
     },
     { KeyValues("OutputMuonCollection", { "RecoMuons" }) }
-  )
+  ),
+  m_histos(*this)
 {}
 
 StatusCode MuonIdentification::initialize()
@@ -37,9 +43,6 @@ StatusCode MuonIdentification::initialize()
   m_ecalB_inner_r = theDetector.constant<float>("ECalBarrel_inner_radius") / dd4hep::mm;
   m_ecalE_min_z = theDetector.constant<float>("ECalEndcap_min_z") / dd4hep::mm;
 
-  // Get Histogram and Data Services
-  m_histSvc = serviceLocator()->service("THistSvc");
-
   // --- Get the track time-of-flight correction
   m_tof_correction = new TFormula("tof_correction", m_formulaStr.value().c_str());
   
@@ -48,6 +51,8 @@ StatusCode MuonIdentification::initialize()
   double bFieldVec[3] = {0., 0., 0.}; 
   theDetector.field().magneticField(pos, bFieldVec);
   m_bField = bFieldVec[2] / dd4hep::tesla;
+
+  m_histos.initialize();
 
   return StatusCode::SUCCESS;
 }
@@ -154,6 +159,9 @@ edm4hep::ReconstructedParticleCollection MuonIdentification::operator()(
       float dtheta = hit_theta - trk_theta;
 
       float deltaR = std::sqrt(std::pow(dphi, 2) + std::pow(dtheta, 2));
+
+      m_histos.fillDeltaR(systemID, layerID, deltaR, trk_pt, trk_theta);
+
       if (deltaR < m_deltaRMatch.value()[systemID - m_muonDetBarrel])
       {
         // --- Calculate the particle total time of flight to the muon detector hit
@@ -165,6 +173,8 @@ edm4hep::ReconstructedParticleCollection MuonIdentification::operator()(
         float tof = (trk_length + dist) / (beta * m_lightSpeed) + tof_correction;
 
         float deltaT = cHit.getTime() + gauss() - tof;
+
+        m_histos.fillDeltaT(systemID, layerID, deltaT, trk_pt, trk_theta);
 
         // Time window selection: use barrel or endcap window depending on system
         if (systemID == m_muonDetBarrel)
@@ -179,6 +189,8 @@ edm4hep::ReconstructedParticleCollection MuonIdentification::operator()(
         n_matchedHits++;
       }
     }
+
+    m_histos.fillMatched(n_matchedHits);
 
     if (n_matchedHits >= m_nHitsMatch)
     {
@@ -205,5 +217,114 @@ edm4hep::ReconstructedParticleCollection MuonIdentification::operator()(
   }
 
   return result;
+}
+
+/* ****************************************************************************
+ *  Friend class for handling histograms
+ * **************************************************************************** */
+
+void MuonIDHistograms::initialize()
+{
+  if (m_algorithm.m_fillHistos.value())
+  {
+    m_hDeltaR_Barrel = m_algorithm.histoSvc()->book("MuonSystem", "hDeltaR_Barrel", 
+        "#DeltaR between tracks and muon detector hits (barrel);#DeltaR [rad]", 1000, 0.0, 0.5);
+    m_hDeltaR_Endcap = m_algorithm.histoSvc()->book("MuonSystem", "hDeltaR_Endcap", 
+        "#DeltaR between tracks and muon detector hits (endcap);#DeltaR [rad]", 1000, 0.0, 0.5);
+    m_hDeltaT_Barrel = m_algorithm.histoSvc()->book("MuonSystem", "hDeltaT_Barrel",
+        "#DeltaT between tracks and muon detector hits (barrel);#DeltaT [ns]", 1000, -10., 10.);
+    m_hDeltaT_Endcap = m_algorithm.histoSvc()->book("MuonSystem", "hDeltaT_Endcap",
+        "#DeltaT between tracks and muon detector hits (endcap);#DeltaT [ns]", 1000, -10., 10.);
+
+    for (unsigned int ih = 0; ih < m_algorithm.m_muonDetBarrelLayers; ++ih)
+    {
+      m_hDeltaR_B.push_back(m_algorithm.histoSvc()->book("MuonSystem",
+          std::format("hDeltaR_B{}", ih).c_str(),
+          std::format("#DeltaR between tracks and muon detector hits (layer B{});#DeltaT [ns]", ih).c_str(),
+          1000, 0., 0.5));
+
+      m_hDeltaT_B.push_back(m_algorithm.histoSvc()->book("MuonSystem",
+          std::format("hDeltaT_B{}", ih).c_str(),
+          std::format("#DeltaT between tracks and muon detector hits (layer B{});#DeltaT [ns]", ih).c_str(),
+          1000, -10., 10.));
+    }
+
+    for (unsigned int ih = 0; ih < m_algorithm.m_muonDetEndcapLayers; ++ih)
+    {
+      m_hDeltaR_E.push_back(m_algorithm.histoSvc()->book("MuonSystem",
+          std::format("hDeltaR_E{}", ih).c_str(),
+          std::format("#DeltaR between tracks and muon detector hits (layer E{});#DeltaR [rad]", ih).c_str(),
+          1000, 0., 0.5));
+
+      m_hDeltaT_E.push_back(m_algorithm.histoSvc()->book("MuonSystem",
+          std::format("hDeltaT_E{}", ih).c_str(),
+          std::format("#DeltaT between tracks and muon detector hits (layer E{});#DeltaT [ns]", ih).c_str(),
+          1000, -10., 10.));
+    }
+
+    m_hDeltaR_vs_Pt = m_algorithm.histoSvc()->book("MuonSystem", "hDeltaR_vs_Pt",
+        "#DeltaR vs p_{T}^{trk};p_{T}^{trk} [GeV];#DeltaR [rad]",
+			  200, 0., 100., 200, 0., 0.5);
+    m_hDeltaT_vs_Pt = m_algorithm.histoSvc()->book("MuonSystem", "hDeltaT_vs_Pt",
+        "#DeltaT vs p_{T}^{trk};p_{T}^{trk} [GeV];#DeltaT [ns]",
+	      200, 0., 100., 200, -0.5, 3.5);
+    m_hDeltaR_vs_Theta = m_algorithm.histoSvc()->book("MuonSystem", "hDeltaR_vs_Theta",
+        "#DeltaR vs #theta_{trk};#theta_{trk} [#circ];#DeltaR [rad]",
+				 200, 0., M_PI, 200, 0., 0.5);
+    m_hDeltaT_vs_Theta = m_algorithm.histoSvc()->book("MuonSystem", "hDeltaT_vs_Theta",
+        "#DeltaT vs #theta_{trk};#theta_{trk} [#circ];#DeltaT [ns]",
+				200, 0., M_PI, 200, -0.5, 3.5);
+
+    m_hNhits = m_algorithm.histoSvc()->book("MuonSystem", "hNhits",
+        "Number of muon detector hits matched to tracks;N_{hits}", 20, 0., 20.);
+  }
+}
+
+void MuonIDHistograms::fillDeltaR(unsigned int system, unsigned int layer, float deltaR, float trk_pt, float trk_theta)
+{
+  if (m_algorithm.m_fillHistos.value())
+  {
+    if (system == m_algorithm.m_muonDetBarrel)
+    {
+	    m_hDeltaR_Barrel->fill(deltaR);
+	    m_hDeltaR_B[layer]->fill(deltaR);
+    }
+    else if (system == m_algorithm.m_muonDetEndcap)
+    {
+	    m_hDeltaR_Endcap->fill(deltaR);
+	    m_hDeltaR_E[layer]->fill(deltaR);
+    }
+    else return;
+	  m_hDeltaR_vs_Pt->fill(trk_pt, deltaR);
+	  m_hDeltaR_vs_Theta->fill(trk_theta, deltaR);
+  }
+}
+
+void MuonIDHistograms::fillDeltaT(unsigned int system, unsigned int layer, float deltaT, float trk_pt, float trk_theta)
+{
+  if (m_algorithm.m_fillHistos.value())
+  {
+    if (system == m_algorithm.m_muonDetBarrel)
+    {
+	    m_hDeltaT_Barrel->fill(deltaT);
+	    m_hDeltaT_B[layer]->fill(deltaT);
+    }
+    else if (system == m_algorithm.m_muonDetEndcap)
+    {
+	    m_hDeltaT_Endcap->fill(deltaT);
+	    m_hDeltaT_E[layer]->fill(deltaT);
+    }
+    else return;
+    m_hDeltaT_vs_Pt->fill(trk_pt ,deltaT);
+	  m_hDeltaT_vs_Theta->fill(trk_theta, deltaT);
+  }
+}
+
+void MuonIDHistograms::fillMatched(int num)
+{
+  if (m_algorithm.m_fillHistos.value())
+  {
+    m_hNhits->fill(num);
+  }
 }
 
