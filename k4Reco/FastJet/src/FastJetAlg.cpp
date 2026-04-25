@@ -201,7 +201,7 @@ StatusCode FastJetAlg::initialize() {
 std::tuple<edm4hep::ReconstructedParticleCollection, edm4hep::ReconstructedParticleCollection> FastJetAlg::operator()(
         const edm4hep::ReconstructedParticleCollection& inputCollection) const {
     edm4hep::ReconstructedParticleCollection outputCollection;
-    outputCollection->setSubsetCollection(true);
+    outputCollection.setSubsetCollection(true);
     edm4hep::ReconstructedParticleCollection jetCollection;
 
     PseudoJetList jets;
