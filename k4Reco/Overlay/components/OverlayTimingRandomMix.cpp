@@ -148,7 +148,7 @@ retType OverlayTimingRandomMix::operator()(
 
   // Copy MCParticles for physics event into a new collection
   for (const auto&& part : particles) {
-    oparticles->push_back(part.clone(false));
+    oparticles.push_back(part.clone(false));
   }
   // Fix relations to point to the new particles
   for (size_t i = 0; i < particles.size(); ++i) {
@@ -172,7 +172,7 @@ retType OverlayTimingRandomMix::operator()(
         auto nhit = simTrackerHit.clone(false);
         if (simTrackerHit.getParticle().getObjectID().index != -1)
           nhit.setParticle(oparticles[simTrackerHit.getParticle().getObjectID().index]);
-        ocoll->push_back(nhit);
+        ocoll.push_back(nhit);
       }
     }
     osimTrackerHits.emplace_back(std::move(ocoll));
