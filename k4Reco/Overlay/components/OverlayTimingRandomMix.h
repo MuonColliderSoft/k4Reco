@@ -48,16 +48,33 @@
 #include "Gaudi/Parsers/Factory.h"
 #include "Gaudi/Property.h"
 
+#include <condition_variable>
+#include <future>
 #include <map>
+#include <queue>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
+#include <mutex>
 
 namespace OverlayTimingRandomMixNS {
   struct EventHolder {
+    struct Request {
+      int fileIndex;
+      int groupIndex;
+      std::promise<podio::Frame> prom;
+    };
+
     std::vector<std::vector<std::string>>   m_fileNames;
     std::vector<std::vector<size_t>>        m_totalNumberOfEvents;
-    std::vector<std::vector<size_t>> m_nextEntry;
+    std::vector<std::vector<size_t>>        m_nextEntry;
+
+    std::queue<Request>                     m_requests; // single queue to serialize all ROOT I/O
+    std::mutex                              m_queueMutex;
+    std::condition_variable                 m_queueCV;
+    std::thread                             m_worker;
+    bool                                    m_stop{false};
 
     EventHolder(const std::vector<std::vector<std::string>>& fileNames) : m_fileNames(fileNames) {
       m_totalNumberOfEvents.resize(m_fileNames.size());
@@ -69,15 +86,56 @@ namespace OverlayTimingRandomMixNS {
           m_totalNumberOfEvents[group].push_back(1);//m_rootFileReaders[group].back().getEntries("events"));
         }
       }
+
+      // Single worker thread to ensure all ROOT I/O happens in one thread (avoids ROOT TFile UUID races)
+      m_worker = std::thread([this]() {
+        while (true) {
+          Request req;
+          {
+            std::unique_lock<std::mutex> lock(m_queueMutex);
+            m_queueCV.wait(lock, [this]() { return m_stop || !m_requests.empty(); });
+            if (m_stop && m_requests.empty()) {
+              return;
+            }
+            req = std::move(m_requests.front());
+            m_requests.pop();
+          }
+
+          try {
+            podio::Reader reader = podio::makeReader(m_fileNames[req.groupIndex][req.fileIndex]);
+            podio::Frame frame   = reader.readEvent(m_nextEntry[req.groupIndex][req.fileIndex]);
+            m_nextEntry[req.groupIndex][req.fileIndex]++;
+            m_nextEntry[req.groupIndex][req.fileIndex] %= m_totalNumberOfEvents[req.groupIndex][req.fileIndex];
+            req.prom.set_value(std::move(frame));
+          } catch (...) {
+            req.prom.set_exception(std::current_exception());
+          }
+        }
+      });
     }
     EventHolder() = default;
 
-    podio::Reader open(int groupIndex, int index) {
-      return podio::makeReader(m_fileNames[groupIndex][index]);
+    ~EventHolder() {
+      {
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        m_stop = true;
+      }
+      m_queueCV.notify_all();
+      if (m_worker.joinable()) {
+        m_worker.join();
+      }
     }
 
-    // TODO: Cache functionality
-    // podio::Frame& read
+    podio::Frame open(int groupIndex, int index) {
+      Request req{index, groupIndex, std::promise<podio::Frame>()};
+      auto fut = req.prom.get_future();
+      {
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        m_requests.push(std::move(req));
+      }
+      m_queueCV.notify_one();
+      return fut.get();
+    }
 
     size_t size() const { return m_fileNames.size(); }
   };
@@ -143,9 +201,6 @@ private:
   Gaudi::Property<bool> m_copyCellIDMetadata{this, "CopyCellIDMetadata", false, "If metadata is found in the signal file, copy it to the output file, replacing the old names with the new names"};
 
   Gaudi::Property<bool> m_mergeMCParticles{this, "MergeMCParticles", true, "Merge the MC Particle collections"};
-
-  // Gaudi::Property<int> m_maxCachedFrames{
-  //   this, "MaxCachedFrames", 0, "Maximum number of frames cached from background files"};
 
 private:
   inline static thread_local std::mt19937 m_engine;
