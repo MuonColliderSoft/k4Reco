@@ -285,7 +285,7 @@ retType OverlayTimingRandomMix::operator()(
 
             npart.setTime(bgParticles[i].getTime() + timeOffset);
             npart.setOverlay(true);
-            oparticles->push_back(npart);
+            oparticles.push_back(npart);
             for (const auto& parent : bgParticles[i].getParents()) {
               parentDaughterMap[j].first.push_back(parent.getObjectID().index);
             }
@@ -348,7 +348,7 @@ retType OverlayTimingRandomMix::operator()(
                 nhit.setMomentum({(float)mom.x, (float)mom.y, (float)mom.z}); 
               }
             }
-            ocoll->push_back(nhit);
+            ocoll.push_back(nhit);
           }
         }
 

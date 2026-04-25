@@ -317,7 +317,7 @@ std::tuple<edm4hep::ReconstructedParticleCollection, edm4hep::ReconstructedParti
     PseudoJetList::iterator it;
     for (it=jets.begin(); it != jets.end(); it++) {
         // create a reconstructed particle for this jet, and add all the containing particles to it
-        edm4hep::MutableReconstructedParticle rec = jetCollection->create();
+        edm4hep::MutableReconstructedParticle rec = jetCollection.create();
         rec.setEnergy( (*it).E() );
         rec.setMass( (*it).m() );
         edm4hep::Vector3f mom((*it).px(), (*it).py(), (*it).pz());
