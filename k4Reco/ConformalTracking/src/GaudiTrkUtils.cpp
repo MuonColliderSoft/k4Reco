@@ -374,8 +374,7 @@ int GaudiTrkUtils::finaliseLCIOTrack(GaudiDDKalTestTrack& marlintrk, edm4hep::Mu
     // create a temporary IMarlinTrack
 
     // TODO
-    auto mTrk = std::make_shared<GaudiDDKalTestTrack>(m_thisAlg, const_cast<GaudiDDKalTest*>(&m_ddkaltest),
-                                                      marlintrk.m_edm4hep_hits_to_kaltest_hits);
+    auto mTrk = std::make_shared<GaudiDDKalTestTrack>(m_thisAlg, const_cast<GaudiDDKalTest*>(&m_ddkaltest));
     // mTrk->m_edm4hep_hits_to_kaltest_hits = ;
 
     edm4hep::TrackState ts;
@@ -383,22 +382,38 @@ int GaudiTrkUtils::finaliseLCIOTrack(GaudiDDKalTestTrack& marlintrk, edm4hep::Mu
     double chi2Tmp = 0;
     int ndfTmp = 0;
     return_error = marlintrk.getTrackState(last_constrained_hit, ts, chi2, ndf);
+    if (return_error != 0) {
+      m_thisAlg->debug() << "GaudiTrk::finaliseLCIOTrack: could not get TrackState at last constrained hit "
+                        << last_constrained_hit << endmsg;
+      return return_error;
+    }
 
     // m_thisAlg->debug()  << "  MarlinTrk::finaliseLCIOTrack:--  TrackState at last constrained hit : " << endmsg
     //   			<< toString( &ts )    << endmsg ;
 
     // need to add a dummy hit to the track
-    mTrk->addHit(last_constrained_hit);
-    mTrk->initialise(ts, fit_direction);
+    return_error = mTrk->addHit(last_constrained_hit);
+    if (return_error != 0) {
+      m_thisAlg->debug() << "MarlinTrk::finaliseLCIOTrack: could not add last constrained hit to temporary track "
+                        << last_constrained_hit << endmsg;
+      return return_error;
+    }
+    return_error = mTrk->initialise(ts, fit_direction);
+    if (return_error != 0) {
+      return return_error;
+    }
 
     auto hI = hits_in_fit.rbegin();
 
-    while ((*hI).first != last_constrained_hit) {
+    while (hI != hits_in_fit.rend() && (*hI).first != last_constrained_hit) {
       // m_thisAlg->debug()  << "  MarlinTrk::finaliseLCIOTrack:--  hit in reverse_iterator : "  << endmsg
       // 			  << toString( (*hI).first ) << endmsg ;
       ++hI;
     }
-
+    if (hI == hits_in_fit.rend()) {
+      m_thisAlg->error() << "MarlinTrk::finaliseLCIOTrack: last constrained hit not found in hits_in_fit" << endmsg;
+      return 1;
+    }
     ++hI;
 
     while (hI != hits_in_fit.rend()) {
@@ -417,6 +432,7 @@ int GaudiTrkUtils::finaliseLCIOTrack(GaudiDDKalTestTrack& marlintrk, edm4hep::Mu
       // TODO
       if (addHit != 0) {
         m_thisAlg->error() << " ****  MarlinTrk::finaliseLCIOTrack:  could not add inner hit to track !!! " << endmsg;
+        return addHit;
       }
 
       ++hI;

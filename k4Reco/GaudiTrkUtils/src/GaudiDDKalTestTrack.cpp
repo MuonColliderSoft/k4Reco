@@ -40,10 +40,38 @@
 
 #include <Gaudi/Algorithm.h>
 
+#include <memory>
 #include <stdexcept>
 
 const int site_fails_chi2_cut = 3;
 const int no_intersection = 4;
+
+namespace {
+// Helper function to create a KalTest hit from an edm4hep TrackerHit and the corresponding measurement layer
+std::unique_ptr<DDVTrackHit> makeKalTestHit(const edm4hep::TrackerHit* trkhit, const DDVMeasLayer* ml) {
+  if (!trkhit || !ml) {
+    return nullptr;
+  }
+  if (!trkhit->isA<edm4hep::TrackerHitPlane>()) {
+    throw std::runtime_error(
+        "GaudiDDKalTestTrack - trkhit is not a TrackerHitPlane, this is not implemented yet");
+  }
+
+  auto hit = IMPL::TrackerHitPlaneImpl();
+  double pos[3] = {
+      trkhit->getPosition()[0],
+      trkhit->getPosition()[1],
+      trkhit->getPosition()[2]
+  };
+
+  hit.setPosition(pos);
+  hit.setCellID0(trkhit->getCellID());
+  hit.setdU(trkhit->as<edm4hep::TrackerHitPlane>().getDu());
+  hit.setdV(trkhit->as<edm4hep::TrackerHitPlane>().getDv());
+
+  return std::unique_ptr<DDVTrackHit>(ml->ConvertLCIOTrkHit(&hit));
+}
+} // namespace
 
 /** Helper class for defining a filter condition based on the delta chi2 in the AddAndFilter step.
  */
@@ -106,33 +134,14 @@ int GaudiDDKalTestTrack::addHit(const edm4hep::TrackerHit* trkhit, const DDVMeas
                      << " ml = " << ml << endmsg;
 
   if (trkhit && ml) {
-    // TODO: a LCIO hit has to be created because it's needed downstream
-    if (!trkhit->isA<edm4hep::TrackerHitPlane>()) {
-      throw std::runtime_error(
-          "GaudiDDKalTestTrack::addHit - trkhit is not a TrackerHitPlane, this is not implemented yet");
+    auto kalhit = makeKalTestHit(trkhit, ml);
+    if (!kalhit) {
+      m_thisAlg->warning() << " GaudiDDKalTestTrack::addHit - failed to create convert hit cellid "
+                           << trkhit->getCellID() << " on meas layer " << ml->GetName() << endmsg;
+      return 1;
     }
-    auto hit = IMPL::TrackerHitPlaneImpl();
-    double pos[3] = {trkhit->getPosition()[0], trkhit->getPosition()[1], trkhit->getPosition()[2]};
-    hit.setPosition(pos);
-    hit.setCellID0(trkhit->getCellID());
-    hit.setdU(trkhit->as<edm4hep::TrackerHitPlane>().getDu());
-    hit.setdV(trkhit->as<edm4hep::TrackerHitPlane>().getDv());
-
-    // Not needed
-    // hit.setCovMatrix(lcioCov);
-    // static_cast<IMPL::TrackerHitImpl*>(static_cast<EVENT::TrackerHit*>(hit))->setCovMatrix(lcioCov);
-    // hit.setQuality(trkhit->getQuality());
-    // hit.setType(trkhit->getType());
-    // hit.setEDep(trkhit->getEDep());
-    // hit.setEDepError(trkhit->getEDepError());
-    // float u[2] = {trkhit->getU()[0], trkhit->getU()[1]};
-    // hit.setU(u);
-    // float v[2] = {trkhit->getV()[0], trkhit->getV()[1]};
-    // hit.setV(v);
-    // hit.setTime(trkhit->getTime());
-
-    auto* kalhit = ml->ConvertLCIOTrkHit(&hit);
-    return this->addHit(trkhit, kalhit, ml);
+    
+    return this->addHit(trkhit, kalhit.release(), ml);
   } else {
     m_thisAlg->warning() << " GaudiDDKalTestTrack::addHit - bad inputs " << trkhit << " ml : " << ml << endmsg;
     return 1;
@@ -352,11 +361,22 @@ int GaudiDDKalTestTrack::addAndFit(DDVTrackHit* kalhit, double& chi2increment, T
   m_thisAlg->debug() << "GaudiDDKalTestTrack::addAndFit called : maxChi2Increment = " << std::scientific
                      << maxChi2Increment << endmsg;
 
+  site = nullptr;
+  chi2increment = DBL_MAX;
+
   if (!m_initialised) {
     throw std::runtime_error("Track fit not initialised");
   }
+  if (!kalhit) {
+    m_thisAlg->warning() << "GaudiDDKalTestTrack::addAndFit called with null kalhit pointer " << endmsg;
+    return 1;
+  }
 
   const auto* ml = dynamic_cast<const DDVMeasLayer*>(&(kalhit->GetMeasLayer()));
+  if (!ml) {
+    m_thisAlg->warning() << "GaudiDDKalTestTrack::addAndFit - failed to find measurement layer for hit " << endmsg;
+    return 1;
+  }
 
   if (m_thisAlg->msgLevel(MSG::DEBUG)) {
     m_thisAlg->debug() << "Kaltrack::addAndFit :  add site to track at index : " << ml->GetIndex() << " for type "
@@ -432,17 +452,18 @@ int GaudiDDKalTestTrack::addAndFit(const edm4hep::TrackerHit* trkhit, double& ch
     return 1;
   }
 
-  auto* kalhit = (*m_edm4hep_hits_to_kaltest_hits)[trkhit];
+  // Here we need to create a fresh KalTest hit owned by THIS track
+  std::unique_ptr<DDVTrackHit> kalhit = makeKalTestHit(trkhit, ml);
 
   if (!kalhit) { // fg: ml->ConvertLCIOTrkHit returns 0 if hit not on surface !!!
     return 1;
   }
 
   TKalTrackSite* site = nullptr;
-  int error_code = this->addAndFit(kalhit, chi2increment, site, maxChi2Increment);
+  DDVTrackHit* kalhitRaw = kalhit.get();
+  int error_code = this->addAndFit(kalhitRaw, chi2increment, site, maxChi2Increment);
 
   if (error_code != 0) {
-    delete kalhit;
 
     // if the hit fails for any reason other than the Chi2 cut record the Chi2 contibution as DBL_MAX
     if (error_code != site_fails_chi2_cut) {
@@ -450,15 +471,20 @@ int GaudiDDKalTestTrack::addAndFit(const edm4hep::TrackerHit* trkhit, double& ch
     }
 
     m_outlier_chi2_values.push_back(std::make_pair(trkhit, chi2increment));
+    m_hit_not_used_for_sites.push_back(trkhit);
 
     m_thisAlg->debug() << ">>>>>>>>>>>  addAndFit Number of Outliers : " << m_outlier_chi2_values.size() << endmsg;
 
     return error_code;
-  } else {
-    this->addHit(trkhit, kalhit, ml);
-    m_hit_used_for_sites[trkhit] = site;
-    m_hit_chi2_values.push_back(std::make_pair(trkhit, chi2increment));
   }
+
+  const int addHitError = this->addHit(trkhit, kalhit.release(), ml);
+  if (addHitError != 0) {
+    return addHitError;
+  }
+
+  m_hit_used_for_sites[trkhit] = site;
+  m_hit_chi2_values.push_back(std::make_pair(trkhit, chi2increment));
 
   // set the values for the point at which the fit becomes constained
   if (!m_trackHitAtPositiveNDF && m_kaltrack->GetNDF() >= 0) {
