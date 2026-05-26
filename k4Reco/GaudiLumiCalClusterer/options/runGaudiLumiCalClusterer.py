@@ -17,7 +17,7 @@
 # limitations under the License.
 #
 
-# This steering file runs conformal tracking starting from a file with digitised collections
+# This steering file runs conformal clustering starting from a file with digitised collections
 # It will not work with a file that has been obtained directly with ddsim
 
 import os
@@ -26,11 +26,8 @@ from Gaudi.Configuration import INFO
 from k4FWCore import ApplicationMgr
 from k4FWCore import IOSvc
 from Configurables import EventDataSvc
-from Configurables import TruthTrackFinder
-from Configurables import UniqueIDGenSvc
+from Configurables import GaudiLumiCalClusterer
 from Configurables import GeoSvc
-
-id_service = UniqueIDGenSvc("UniqueIDGenSvc")
 
 eds = EventDataSvc("EventDataSvc")
 
@@ -42,24 +39,40 @@ geoservice.OutputLevel = INFO
 geoservice.EnableGeant4Geo = False
 
 iosvc = IOSvc()
-iosvc.Input = "output_truth_tracking_REC.edm4hep.root"
-iosvc.Output = "output_truth_track_finder.root"
+iosvc.Input = "output_REC.edm4hep.root"
+iosvc.Output = "output_gaudi_lumical_clustering.root"
 
-truth_track_finder = TruthTrackFinder(
-    "TruthTrackFinder",
-    MCParticleCollectionName=["MCParticles"],
-    SiTrackCollectionName="GaudiSiTracks",
-    SiTrackRelationCollectionName="GaudiSiTrackRelations",
-    SimTrackerHitRelCollectionNames=["VXDTrackerHitRelations", "InnerTrackerBarrelHitsRelations", "OuterTrackerBarrelHitsRelations", "VXDEndcapTrackerHitRelations", "InnerTrackerEndcapHitsRelations", "OuterTrackerEndcapHitsRelations"],
-    TrackerHitCollectionNames=["VXDTrackerHits", "ITrackerHits", "OTrackerHits", "VXDEndcapTrackerHits", "ITrackerEndcapHits", "OTrackerEndcapHits"],
-    UseTruthInPrefit=False,
-    FitForward=True,
-)
+clustering = GaudiLumiCalClusterer("GaudiLumiCalClusterer")
+
+# Input collections
+clustering.LumiCal_Collection = "LumiCalCollection"
+
+# Output collections
+clustering.LumiCal_Hits = "GaudiLumiCalHits"
+clustering.LumiCal_Clusters = "GaudiLumiCalClusters"
+clustering.LumiCal_RecoParticles = "GaudiLumiCalRecoParticles"
+
+clustering.ClusterMinNumHits = 15
+clustering.ElementsPercentInShowerPeakLayer = 0.03
+clustering.EnergyCalibConst = 0.01213
+clustering.LogWeigthConstant = 6.5
+clustering.MaxRecordNumber = 10
+clustering.MemoryResidentTree = 0
+clustering.MiddleEnergyHitBoundFrac = 0.01
+clustering.MinClusterEngy = 2.0
+clustering.MinHitEnergy = 20e-6
+clustering.MoliereRadius = 20
+clustering.NumEventsTree = 500
+clustering.NumOfNearNeighbor = 6
+clustering.OutDirName = "rootOut"
+clustering.OutRootFileName = ""
+clustering.WeightingMethod = "LogMethod"
+
 
 ApplicationMgr(
-    TopAlg=[truth_track_finder],
+    TopAlg=[clustering],
     EvtSel="NONE",
-    EvtMax=1,
+    EvtMax=3,
     ExtSvc=[eds, geoservice],
     OutputLevel=INFO,
 )

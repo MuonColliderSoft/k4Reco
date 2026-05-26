@@ -34,15 +34,16 @@
 #include <string>
 
 RefitFinal::RefitFinal(const std::string& name, ISvcLocator* svcLoc)
-    : MultiTransformer(name, svcLoc,
-                       {
-                           KeyValues("InputTrackCollectionName", {"TruthTracks"}),
-                           KeyValues("InputRelationCollectionName", {"SiTrackRelations"}),
-                       },
-                       {
-                           KeyValues("OutputTrackCollectionName", {"RefittedTracks"}),
-                           KeyValues("OutputRelationCollectionName", {"RefittedRelation"}),
-                       }) {}
+    : MultiTransformer(
+          name, svcLoc,
+          {
+              KeyValue("InputTrackCollectionName", "TruthTracks"),
+              KeyValues("InputRelationCollectionName", {"SiTrackRelations"}), // KeyValues so that it can be empty
+          },
+          {
+              KeyValue("OutputTrackCollectionName", "RefittedTracks"),
+              KeyValue("OutputRelationCollectionName", "RefittedRelation"),
+          }) {}
 
 StatusCode RefitFinal::initialize() {
   // Setting the streamlog output is necessary to avoid lots of overhead.
@@ -137,11 +138,18 @@ std::tuple<edm4hep::TrackCollection, edm4hep::TrackMCParticleLinkCollection> Ref
       m_encodingStringVariable.value()
     );
 
-    int return_code = trkUtils.createFinalisedLCIOTrack(
-      gaudi_trk, trkHitsPtr, edm4hep_trk, 
-      fit_direction, initialCov, m_bField, 
-      m_Max_Chi2_Incr.value()
-    );
+    // debug() << "RefitHit: Trackstate after fit()\n" << marlin_trk.toString() << endmsg;
+
+    if (fit_status != 0) {
+      continue;
+    }
+
+    edm4hep::MutableTrack lcio_trk;
+
+    GaudiTrkUtils trkUtils(static_cast<const Gaudi::Algorithm*>(this), m_ddkaltest, m_geoSvc,
+                           m_encodingStringVariable.value());
+
+    int return_code = trkUtils.finaliseLCIOTrack(marlin_trk, lcio_trk, trkHitsPtr, true);
 
     if (return_code != 0) {
       debug() << "finaliseLCIOTrack failed" << endmsg;
@@ -208,12 +216,7 @@ std::tuple<edm4hep::TrackCollection, edm4hep::TrackMCParticleLinkCollection> Ref
       continue;
     }
 
-    // create the Track-MCParticle relation
-    if (trackIndexToMCParticle.find(static_cast<int>(track.getObjectID().index)) != trackIndexToMCParticle.end()) {
-      edm4hep::MutableTrackMCParticleLink relation = trackRelationCollection.create();
-      relation.setFrom(edm4hep_trk);
-      relation.setTo(trackIndexToMCParticle.at(static_cast<int>(track.getObjectID().index)));
-    }
+    trackVec.push_back(lcio_trk);
   } // for loop to the tracks
 
   debug() << "Final number of Tracks after refit = " << trackVec.size()

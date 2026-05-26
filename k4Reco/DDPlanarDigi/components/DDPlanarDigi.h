@@ -38,21 +38,11 @@
 #include <string>
 #include <vector>
 
-#include "GAUDI_VERSION.h"
-
-#if GAUDI_MAJOR_VERSION < 39
-namespace Gaudi::Accumulators {
-template <unsigned int ND, atomicity Atomicity = atomicity::full, typename Arithmetic = double>
-using StaticRootHistogram =
-    Gaudi::Accumulators::RootHistogramingCounterBase<ND, Atomicity, Arithmetic, naming::histogramString>;
-}
-#endif
-
 /** ======= DDPlanarDigi ========== <br>
  * Creates TrackerHits from SimTrackerHits, smearing them according to the input parameters.
  * The positions of "digitized" TrackerHits are obtained by gaussian smearing positions
  * of SimTrackerHits perpendicular and along the ladder according to the specified point resolutions.
- * The geometry of the surface is retreived from DDRec::Surface associated to the hit via cellID.
+ * The geometry of the surface is retrieved from DDRec::Surface associated to the hit via cellID.
  *
  *
  * <h4>Input collections and prerequisites</h4>
@@ -106,7 +96,7 @@ private:
       "Resolution in the direction of t; either one per layer or one for all layers. If the single entry is negative, "
       "disable time smearing. "};
   Gaudi::Property<bool> m_forceHitsOntoSurface{this, "ForceHitsOntoSurface", false,
-                                               "Project hits onto the surfoce in case they are not yet on the surface"};
+                                               "Project hits onto the surface in case they are not yet on the surface"};
   Gaudi::Property<double> m_minEnergy{this, "MinEnergy", 0.0, "Minimum energy (GeV) of SimTrackerHit to be digitized"};
 
   Gaudi::Property<bool> m_useTimeWindow{
