@@ -209,10 +209,10 @@ std::tuple<edm4hep::TrackCollection, edm4hep::TrackMCParticleLinkCollection> Ref
     }
 
     // create the Track-MCParticle relation
-    if (trackIndexToMCParticle.find(static_cast<int>(iTrack)) != trackIndexToMCParticle.end()) {
+    if (trackIndexToMCParticle.find(static_cast<int>(track.getObjectID().index)) != trackIndexToMCParticle.end()) {
       edm4hep::MutableTrackMCParticleLink relation = trackRelationCollection.create();
       relation.setFrom(edm4hep_trk);
-      relation.setTo(trackIndexToMCParticle.at(static_cast<int>(iTrack)));
+      relation.setTo(trackIndexToMCParticle.at(static_cast<int>(track.getObjectID().index)));
     }
   } // for loop to the tracks
 
