@@ -69,9 +69,10 @@ GaudiDDKalTest::~GaudiDDKalTest() {
 //   }
 // }
 
-void GaudiDDKalTest::init(bool msOn, bool energyLossOn) {
-  this->includeMultipleScattering(msOn);
-  this->includeEnergyLoss(energyLossOn);
+void GaudiDDKalTest::init() {
+  // TODO: Don't hardcode the options
+  this->includeMultipleScattering(true);
+  this->includeEnergyLoss(true);
   // this->sm
 
   // std::cout << " -------------------------------------------------------------------------------- " << endmsg;
