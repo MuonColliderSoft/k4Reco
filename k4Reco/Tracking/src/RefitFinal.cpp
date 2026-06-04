@@ -60,7 +60,7 @@ StatusCode RefitFinal::initialize() {
   std::string cellIDEncodingString = m_geoSvc->constantAsString(m_encodingStringVariable.value());
   m_encoder = dd4hep::DDSegmentation::BitFieldCoder(cellIDEncodingString);
 
-  m_ddkaltest.init(m_MSOn, m_ElossOn);
+  m_ddkaltest.init();
   m_ddkaltest.setEncoder(m_encoder);
 
   return StatusCode::SUCCESS;
