@@ -28,6 +28,9 @@ set(sources
   CaloDigi/src/RealisticCaloRecoSilicon.cc
   CaloDigi/src/RealisticCaloDigi.cc
   CaloDigi/src/RealisticCaloReco.cc
+  BIBUtils/src/CaloConer.cpp
+  BIBUtils/src/CaloHitSelector.cpp
+  BIBUtils/src/FilterConeHits.cpp
 )
 
 if(DEFINED FASTJETPLUGINS_LIBRARY)
@@ -47,6 +50,7 @@ set(libs
         ROOT::Core
         ROOT::MathCore
         ROOT::Tree
+        ROOT::Hist
         CLHEP::Random
         ${FASTJET_LIBRARIES}
 )
@@ -122,6 +126,7 @@ set(k4RecoPlugins_public_includes
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/CaloDigi/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/FastJet/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/BIBUtils/include>
   ${FASTJET_INCLUDE_DIRS}
 )
 
