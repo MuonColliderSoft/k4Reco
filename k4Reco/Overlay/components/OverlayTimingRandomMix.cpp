@@ -424,11 +424,11 @@ OverlayTimingRandomMix::operator()(const edm4hep::EventHeaderCollection& headers
 
   debug() << "\n\t\tCollection\t\t|\t\tPre BIB\t\t|\t\tPost "
              "BIB\t\t\n--------------------------------------------------------------------------\n";
-  for (int trkCol = 0; trkCol < simTrackerHits.size(); trkCol++) {
+  for (std::size_t trkCol = 0; trkCol < simTrackerHits.size(); trkCol++) {
     debug() << "\tTrackerHits " << trkCol << "\t|\t\t" << simTrackerHits[trkCol]->size() << "\t\t|\t\t"
             << osimTrackerHits[trkCol].size() << "\n";
   }
-  for (int calCol = 0; calCol < simCaloHits.size(); calCol++) {
+  for (std::size_t calCol = 0; calCol < simCaloHits.size(); calCol++) {
     debug() << "\tCaloHits " << calCol << "\t|\t\t" << simCaloHits[calCol]->size() << "\t\t|\t\t"
             << osimCaloHits[calCol].size() << "\n";
   }

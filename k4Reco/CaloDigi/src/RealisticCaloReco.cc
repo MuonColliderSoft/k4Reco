@@ -63,7 +63,7 @@ RealisticCaloReco::operator()(const edm4hep::CaloHitSimCaloHitLinkCollection& in
   edm4hep::CaloHitSimCaloHitLinkCollection relcol;
   debug() << " number of elements = " << inputLinks.size() << endmsg;
 
-  for (int j(0); j < inputLinks.size(); ++j) {
+  for (std::size_t j(0); j < inputLinks.size(); ++j) {
     edm4hep::CaloHitSimCaloHitLink link = inputLinks.at(j);
     edm4hep::CalorimeterHit hit0 = link.getFrom();
     edm4hep::CalorimeterHit* hit = &hit0;

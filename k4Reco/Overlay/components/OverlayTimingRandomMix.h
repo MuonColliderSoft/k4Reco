@@ -80,9 +80,9 @@ struct EventHolder {
     m_totalNumberOfEvents.resize(m_fileNames.size());
     m_nextEntry.resize(m_fileNames.size());
 
-    for (int group = 0; group < m_fileNames.size(); group++) {
+    for (std::size_t group = 0; group < m_fileNames.size(); group++) {
       m_nextEntry[group].resize(m_fileNames[group].size());
-      for (auto& name : m_fileNames[group]) {
+      for ([[maybe_unused]] auto& name : m_fileNames[group]) {
         m_totalNumberOfEvents[group].push_back(1); // m_rootFileReaders[group].back().getEntries("events"));
       }
     }

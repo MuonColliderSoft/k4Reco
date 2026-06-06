@@ -32,7 +32,7 @@ enum EClusterMode {
 
 namespace {
 
-std::ostream& operator<<(std::ostream& out, EClusterMode& m) {
+[[maybe_unused]] std::ostream& operator<<(std::ostream& out, EClusterMode& m) {
   switch (m) {
   case OWN_inclusiveIteration:
     out << "InclusiveIterativeNJets";

@@ -125,7 +125,7 @@ RealisticCaloDigi::operator()(const edm4hep::SimCalorimeterHitCollection& inputS
 
   debug() << "Number of elements = " << inputSim.size() << endmsg;
   // loop over input hits
-  for (int j = 0; j < inputSim.size(); ++j) {
+  for (std::size_t j = 0; j < inputSim.size(); ++j) {
     edm4hep::SimCalorimeterHit simhit0 = inputSim.at(j);
     edm4hep::SimCalorimeterHit* simhit = &simhit0;
 
@@ -251,7 +251,7 @@ RealisticCaloDigi::integr_res_opt RealisticCaloDigi::ROCIntegration(const edm4he
   const unsigned int ncontrib = hit->contributions_size();
   // Sort MC contribution by time
   std::vector<MCC> mcconts{ncontrib};
-  for (int i = 0; i < hit->getContributions().size(); i++) {
+  for (std::size_t i = 0; i < hit->getContributions().size(); i++) {
     mcconts[i].energy = hit->getContributions(i).getEnergy();
     mcconts[i].time = hit->getContributions(i).getTime();
   }

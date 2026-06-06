@@ -216,11 +216,11 @@ FastJetAlg::operator()(const edm4hep::ReconstructedParticleCollection& inputColl
 
   PseudoJetList jets;
   PseudoJetList pjList;
-  for (int i = 0; i < inputCollection.size(); ++i) {
+  for (std::size_t i = 0; i < inputCollection.size(); ++i) {
     edm4hep::ReconstructedParticle par = inputCollection.at(i);
     pjList.push_back(
         fastjet::PseudoJet(par.getMomentum().x, par.getMomentum().y, par.getMomentum().z, par.getEnergy()));
-    pjList.back().set_user_index(i); // save the id of this recParticle
+    pjList.back().set_user_index(static_cast<int>(i)); // save the id of this recParticle
   }
 
   fastjet::ClusterSequence cs = fastjet::ClusterSequence(pjList, *m_jetAlgo);
@@ -231,7 +231,7 @@ FastJetAlg::operator()(const edm4hep::ReconstructedParticleCollection& inputColl
       jets = cs.exclusive_jets_ycut(m_yCut);
     } else if (m_clusterMode == FJ_exclusive_nJets) {
       // sanity check: if we have not enough particles, FJ will cause an assert
-      if (inputCollection.size() < (int)m_requestedNumberOfJets) {
+      if (inputCollection.size() < static_cast<std::size_t>(m_requestedNumberOfJets)) {
         warning() << "Not enough elements in the input collection to create " << m_requestedNumberOfJets << " jets."
                   << endmsg;
         throw SkippedFixedNrJetException();
@@ -240,7 +240,7 @@ FastJetAlg::operator()(const edm4hep::ReconstructedParticleCollection& inputColl
       }
     } else if (m_clusterMode == OWN_inclusiveIteration) {
       // sanity check: if we have not enough particles, FJ will cause an assert
-      if (inputCollection.size() < (int)m_requestedNumberOfJets) {
+      if (inputCollection.size() < static_cast<std::size_t>(m_requestedNumberOfJets)) {
         warning() << "Not enough elements in the input collection to create " << m_requestedNumberOfJets << " jets."
                   << endmsg;
         throw SkippedFixedNrJetException();
