@@ -1,19 +1,35 @@
+/*
+ * Copyright (c) 2020-2024 Key4hep-Project.
+ *
+ * This file is part of Key4hep.
+ * See https://key4hep.github.io/key4hep-doc/ for further info.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #ifndef FilterDoubleLayerHits_h
 #define FilterDoubleLayerHits_h 1
 
-#include <k4FWCore/Transformer.h>
 #include "k4Interface/IGeoSvc.h"
 #include <GaudiKernel/ITHistSvc.h>
+#include <k4FWCore/Transformer.h>
 
 #include "DDRec/SurfaceManager.h"
-#include <edm4hep/TrackerHitPlaneCollection.h>
 #include <edm4hep/TrackerHitPlane.h>
+#include <edm4hep/TrackerHitPlaneCollection.h>
 
 #include <string>
 
 #include <TH1.h>
-
-
 
 /** Utility processor that removes tracker hits in double layers if they don't have
  *  a corresponding close-by hit in the other sublayer.
@@ -28,14 +44,13 @@
  * @version $Id: $
  */
 
-struct FilterDoubleLayerHits : public k4FWCore::Transformer<edm4hep::TrackerHitPlaneCollection(
-  const edm4hep::TrackerHitPlaneCollection &)> {
+struct FilterDoubleLayerHits
+    : public k4FWCore::Transformer<edm4hep::TrackerHitPlaneCollection(const edm4hep::TrackerHitPlaneCollection&)> {
 
 protected:
-
   static const size_t NHITS_MAX = 10000000;
 
-  struct SensorPosition{
+  struct SensorPosition {
     unsigned int layer;
     unsigned int side;
     unsigned int ladder;
@@ -47,49 +62,55 @@ protected:
   };
 
   /// Double layer cut struct
-  struct DoubleLayerCut{
-    unsigned int layer0 ;
-    unsigned int layer1 ;
-    double dPhi_max ;
-    double dTheta_max ;
+  struct DoubleLayerCut {
+    unsigned int layer0;
+    unsigned int layer1;
+    double dPhi_max;
+    double dTheta_max;
   };
 
-
- public:
-  FilterDoubleLayerHits(const std::string& name, ISvcLocator* svcLoc) ;
+public:
+  FilterDoubleLayerHits(const std::string& name, ISvcLocator* svcLoc);
 
   /** Called at the begin of the job before anything is read.
    * Use to initialize the processor, e.g. book histograms.
    */
-  virtual StatusCode initialize() ;
+  virtual StatusCode initialize();
 
   /** Called for every event - the working horse.
    */
-  edm4hep::TrackerHitPlaneCollection operator()(const edm4hep::TrackerHitPlaneCollection& inputTrackerHitCollection) const override;
+  edm4hep::TrackerHitPlaneCollection
+  operator()(const edm4hep::TrackerHitPlaneCollection& inputTrackerHitCollection) const override;
 
   /** Called after data processing for clean up.
    */
   virtual StatusCode finalize();
 
-
- protected:
-  dd4hep::rec::Vector2D globalToLocal(long int cellID, const dd4hep::rec::Vector3D& posGlobal, dd4hep::rec::ISurface** surf) const;
+protected:
+  dd4hep::rec::Vector2D globalToLocal(long int cellID, const dd4hep::rec::Vector3D& posGlobal,
+                                      dd4hep::rec::ISurface** surf) const;
 
   Gaudi::Property<std::string> m_subDetName{this, "SubDetectorName", "Vertex", "Name of sub detector"};
   Gaudi::Property<bool> m_fillHistos{this, "FillHistograms", false, "Whether to fill diagnostic histograms"};
   Gaudi::Property<double> m_dtMax{this, "DeltaTimeMax", -1.0, "Maximum time difference between hits in a doublet [ns]"};
-  Gaudi::Property<std::string> m_encodingStringVariable{this, "EncodingStringParameterName", "GlobalTrackerReadoutID", "The name of the DD4hep constant that contains the Encoding string for tracking detectors"};
-  Gaudi::Property<std::vector<std::string>> m_dlCutConfigs{this, "DoubleLayerCuts" , {"0", "1", "0.5", "0.05"}, "Layer IDs and angular cuts [mrad] to be applied: <layer 0> <layer 1> <dPhi> <dTheta>"};
+  Gaudi::Property<std::string> m_encodingStringVariable{
+      this, "EncodingStringParameterName", "GlobalTrackerReadoutID",
+      "The name of the DD4hep constant that contains the Encoding string for tracking detectors"};
+  Gaudi::Property<std::vector<std::string>> m_dlCutConfigs{
+      this,
+      "DoubleLayerCuts",
+      {"0", "1", "0.5", "0.05"},
+      "Layer IDs and angular cuts [mrad] to be applied: <layer 0> <layer 1> <dPhi> <dTheta>"};
 
   ////Double layer cuts configuration
-  std::vector<DoubleLayerCut> m_dlCuts {};
+  std::vector<DoubleLayerCut> m_dlCuts{};
   ////Surface map for getting local hit positions at sensor surface
-  const dd4hep::rec::SurfaceMap* m_map {nullptr};
+  const dd4hep::rec::SurfaceMap* m_map{nullptr};
   ////Monitoring histograms
-  std::map<std::string, TH1*> m_histos {};
+  std::map<std::string, TH1*> m_histos{};
   // GeoSvc
-  SmartIF<IGeoSvc>   m_geoSvc;
+  SmartIF<IGeoSvc> m_geoSvc;
   SmartIF<ITHistSvc> m_histSvc;
-} ;
+};
 
 #endif

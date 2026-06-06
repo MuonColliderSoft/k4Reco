@@ -51,158 +51,174 @@
 #include <condition_variable>
 #include <future>
 #include <map>
+#include <mutex>
 #include <queue>
 #include <random>
 #include <string>
 #include <thread>
 #include <vector>
-#include <mutex>
 
 namespace OverlayTimingRandomMixNS {
-  struct EventHolder {
-    struct Request {
-      int fileIndex;
-      int groupIndex;
-      std::promise<podio::Frame> prom;
-    };
-
-    std::vector<std::vector<std::string>>   m_fileNames;
-    std::vector<std::vector<size_t>>        m_totalNumberOfEvents;
-    std::vector<std::vector<size_t>>        m_nextEntry;
-
-    std::queue<Request>                     m_requests; // single queue to serialize all ROOT I/O
-    std::mutex                              m_queueMutex;
-    std::condition_variable                 m_queueCV;
-    std::thread                             m_worker;
-    bool                                    m_stop{false};
-
-    EventHolder(const std::vector<std::vector<std::string>>& fileNames) : m_fileNames(fileNames) {
-      m_totalNumberOfEvents.resize(m_fileNames.size());
-      m_nextEntry.resize(m_fileNames.size());
-
-      for (int group = 0; group < m_fileNames.size(); group++) {
-        m_nextEntry[group].resize(m_fileNames[group].size());
-        for (auto& name : m_fileNames[group]) {
-          m_totalNumberOfEvents[group].push_back(1);//m_rootFileReaders[group].back().getEntries("events"));
-        }
-      }
-
-      // Single worker thread to ensure all ROOT I/O happens in one thread (avoids ROOT TFile UUID races)
-      m_worker = std::thread([this]() {
-        while (true) {
-          Request req;
-          {
-            std::unique_lock<std::mutex> lock(m_queueMutex);
-            m_queueCV.wait(lock, [this]() { return m_stop || !m_requests.empty(); });
-            if (m_stop && m_requests.empty()) {
-              return;
-            }
-            req = std::move(m_requests.front());
-            m_requests.pop();
-          }
-
-          try {
-            podio::Reader reader = podio::makeReader(m_fileNames[req.groupIndex][req.fileIndex]);
-            podio::Frame frame   = reader.readEvent(m_nextEntry[req.groupIndex][req.fileIndex]);
-            m_nextEntry[req.groupIndex][req.fileIndex]++;
-            m_nextEntry[req.groupIndex][req.fileIndex] %= m_totalNumberOfEvents[req.groupIndex][req.fileIndex];
-            req.prom.set_value(std::move(frame));
-          } catch (...) {
-            req.prom.set_exception(std::current_exception());
-          }
-        }
-      });
-    }
-    EventHolder() = default;
-
-    ~EventHolder() {
-      {
-        std::lock_guard<std::mutex> lock(m_queueMutex);
-        m_stop = true;
-      }
-      m_queueCV.notify_all();
-      if (m_worker.joinable()) {
-        m_worker.join();
-      }
-    }
-
-    podio::Frame open(int groupIndex, int index) {
-      Request req{index, groupIndex, std::promise<podio::Frame>()};
-      auto fut = req.prom.get_future();
-      {
-        std::lock_guard<std::mutex> lock(m_queueMutex);
-        m_requests.push(std::move(req));
-      }
-      m_queueCV.notify_one();
-      return fut.get();
-    }
-
-    size_t size() const { return m_fileNames.size(); }
+struct EventHolder {
+  struct Request {
+    int fileIndex;
+    int groupIndex;
+    std::promise<podio::Frame> prom;
   };
-}
+
+  std::vector<std::vector<std::string>> m_fileNames;
+  std::vector<std::vector<size_t>> m_totalNumberOfEvents;
+  std::vector<std::vector<size_t>> m_nextEntry;
+
+  std::queue<Request> m_requests; // single queue to serialize all ROOT I/O
+  std::mutex m_queueMutex;
+  std::condition_variable m_queueCV;
+  std::thread m_worker;
+  bool m_stop{false};
+
+  EventHolder(const std::vector<std::vector<std::string>>& fileNames) : m_fileNames(fileNames) {
+    m_totalNumberOfEvents.resize(m_fileNames.size());
+    m_nextEntry.resize(m_fileNames.size());
+
+    for (int group = 0; group < m_fileNames.size(); group++) {
+      m_nextEntry[group].resize(m_fileNames[group].size());
+      for (auto& name : m_fileNames[group]) {
+        m_totalNumberOfEvents[group].push_back(1); // m_rootFileReaders[group].back().getEntries("events"));
+      }
+    }
+
+    // Single worker thread to ensure all ROOT I/O happens in one thread (avoids ROOT TFile UUID races)
+    m_worker = std::thread([this]() {
+      while (true) {
+        Request req;
+        {
+          std::unique_lock<std::mutex> lock(m_queueMutex);
+          m_queueCV.wait(lock, [this]() { return m_stop || !m_requests.empty(); });
+          if (m_stop && m_requests.empty()) {
+            return;
+          }
+          req = std::move(m_requests.front());
+          m_requests.pop();
+        }
+
+        try {
+          podio::Reader reader = podio::makeReader(m_fileNames[req.groupIndex][req.fileIndex]);
+          podio::Frame frame = reader.readEvent(m_nextEntry[req.groupIndex][req.fileIndex]);
+          m_nextEntry[req.groupIndex][req.fileIndex]++;
+          m_nextEntry[req.groupIndex][req.fileIndex] %= m_totalNumberOfEvents[req.groupIndex][req.fileIndex];
+          req.prom.set_value(std::move(frame));
+        } catch (...) {
+          req.prom.set_exception(std::current_exception());
+        }
+      }
+    });
+  }
+  EventHolder() = default;
+
+  ~EventHolder() {
+    {
+      std::lock_guard<std::mutex> lock(m_queueMutex);
+      m_stop = true;
+    }
+    m_queueCV.notify_all();
+    if (m_worker.joinable()) {
+      m_worker.join();
+    }
+  }
+
+  podio::Frame open(int groupIndex, int index) {
+    Request req{index, groupIndex, std::promise<podio::Frame>()};
+    auto fut = req.prom.get_future();
+    {
+      std::lock_guard<std::mutex> lock(m_queueMutex);
+      m_requests.push(std::move(req));
+    }
+    m_queueCV.notify_one();
+    return fut.get();
+  }
+
+  size_t size() const { return m_fileNames.size(); }
+};
+} // namespace OverlayTimingRandomMixNS
 
 using retType =
     std::tuple<edm4hep::MCParticleCollection, std::vector<edm4hep::SimTrackerHitCollection>,
                std::vector<edm4hep::SimCalorimeterHitCollection>, std::vector<edm4hep::CaloHitContributionCollection>>;
 
 struct OverlayTimingRandomMix : public k4FWCore::MultiTransformer<retType(
-                           const edm4hep::EventHeaderCollection& headers, const edm4hep::MCParticleCollection&,
-                           const std::vector<const edm4hep::SimTrackerHitCollection*>&,
-                           const std::vector<const edm4hep::SimCalorimeterHitCollection*>&)> {
+                                    const edm4hep::EventHeaderCollection& headers, const edm4hep::MCParticleCollection&,
+                                    const std::vector<const edm4hep::SimTrackerHitCollection*>&,
+                                    const std::vector<const edm4hep::SimCalorimeterHitCollection*>&)> {
   OverlayTimingRandomMix(const std::string& name, ISvcLocator* svcLoc)
-      : MultiTransformer(
-            name, svcLoc,
-            {KeyValues("EventHeader", {"EventHeader"}), KeyValues("MCParticles", {"DefaultMCParticles"}),
-             KeyValues("SimTrackerHits", {"DefaultSimTrackerHits"}),
-             KeyValues("SimCalorimeterHits", {"DefaultSimCalorimeterHits"})},
-            {KeyValues("OutputMCParticles", {"NewMCParticles"}), KeyValues("OutputSimTrackerHits", {"NewSimTrackerHits"}),
-             KeyValues("OutputSimCalorimeterHits", {"NewSimCalorimeterHits"}),
-             KeyValues("OutputCaloHitContributions", {"OverlayCaloHitContributions"})}) {}
+      : MultiTransformer(name, svcLoc,
+                         {KeyValues("EventHeader", {"EventHeader"}), KeyValues("MCParticles", {"DefaultMCParticles"}),
+                          KeyValues("SimTrackerHits", {"DefaultSimTrackerHits"}),
+                          KeyValues("SimCalorimeterHits", {"DefaultSimCalorimeterHits"})},
+                         {KeyValues("OutputMCParticles", {"NewMCParticles"}),
+                          KeyValues("OutputSimTrackerHits", {"NewSimTrackerHits"}),
+                          KeyValues("OutputSimCalorimeterHits", {"NewSimCalorimeterHits"}),
+                          KeyValues("OutputCaloHitContributions", {"OverlayCaloHitContributions"})}) {}
 
-  template <typename T> void overlayCollection(std::string collName, const podio::CollectionBase& inColl);
+  template <typename T>
+  void overlayCollection(std::string collName, const podio::CollectionBase& inColl);
 
   virtual StatusCode initialize() final;
   virtual StatusCode finalize() final;
 
-  retType virtual operator()(
-      const edm4hep::EventHeaderCollection& headers, const edm4hep::MCParticleCollection& mcParticles,
-      const std::vector<const edm4hep::SimTrackerHitCollection*>&     simTrackerHits,
-      const std::vector<const edm4hep::SimCalorimeterHitCollection*>& simCalorimeterHits) const final;
+  retType virtual
+  operator()(const edm4hep::EventHeaderCollection& headers, const edm4hep::MCParticleCollection& mcParticles,
+             const std::vector<const edm4hep::SimTrackerHitCollection*>& simTrackerHits,
+             const std::vector<const edm4hep::SimCalorimeterHitCollection*>& simCalorimeterHits) const final;
 
   std::pair<float, float> define_time_windows(const std::string& Collection_name) const;
 
 private:
   // These correspond to the index position in the argument list
   constexpr static int SIMTRACKERHIT_INDEX_POSITION = 2;
-  constexpr static int SIMCALOHIT_INDEX_POSITION    = 3;
+  constexpr static int SIMCALOHIT_INDEX_POSITION = 3;
 
-  Gaudi::Property<bool>        m_randomBX{this, "RandomBx", false, "Place the physics event at an random position in the train: overrides PhysicsBX"};
+  Gaudi::Property<bool> m_randomBX{this, "RandomBx", false,
+                                   "Place the physics event at an random position in the train: overrides PhysicsBX"};
   mutable Gaudi::Property<int> m_physBX{this, "PhysicsBX", 1, "Number of the Bunch crossing of the physics event"};
-  Gaudi::Property<int>         m_NBunchTrain{this, "NBunchtrain", 1, "Number of bunches in a bunch train"};
+  Gaudi::Property<int> m_NBunchTrain{this, "NBunchtrain", 1, "Number of bunches in a bunch train"};
   // Gaudi::Property<int>         m_startWithBackgroundFile{this, "StartBackgroundFileIndex", -1,
   //                                                "Which background file to startWith"};
-  Gaudi::Property<int> m_startWithBackgroundEvent{this, "StartBackgroundEventIndex", -1, "Which background event to startWith"};
+  Gaudi::Property<int> m_startWithBackgroundEvent{this, "StartBackgroundEventIndex", -1,
+                                                  "Which background event to startWith"};
 
-  Gaudi::Property<std::vector<std::vector<std::string>>> m_inputFileNames{this, "BackgroundFileNames", {}, "Name of the edm4hep input file(s) with background."};
-  //Gaudi::Property<bool> m_separateEventFiles{this, "SeparateEventFiles", false, "For setups where each event is in a different file (like Muon Collider)."}
+  Gaudi::Property<std::vector<std::vector<std::string>>> m_inputFileNames{
+      this, "BackgroundFileNames", {}, "Name of the edm4hep input file(s) with background."};
+  // Gaudi::Property<bool> m_separateEventFiles{this, "SeparateEventFiles", false, "For setups where each event is in a
+  // different file (like Muon Collider)."}
 
-  Gaudi::Property<std::vector<double>> m_Noverlay{this, "NumberBackground", {}, "Number of Background events to overlay - either fixed or Poisson mean"};
+  Gaudi::Property<std::vector<double>> m_Noverlay{
+      this, "NumberBackground", {}, "Number of Background events to overlay - either fixed or Poisson mean"};
 
-  Gaudi::Property<std::vector<bool>> m_Poisson{this, "Poisson_random_NOverlay", {}, "Draw random number of Events to overlay from Poisson distribution with mean value NumberBackground"};
+  Gaudi::Property<std::vector<bool>> m_Poisson{
+      this,
+      "Poisson_random_NOverlay",
+      {},
+      "Draw random number of Events to overlay from Poisson distribution with mean value NumberBackground"};
 
-  Gaudi::Property<std::string> m_MCParticleCollectionName{this, "BackgroundMCParticleCollectionName", "MCParticle", "The name of the MCParticle collection in the background files"};
+  Gaudi::Property<std::string> m_MCParticleCollectionName{
+      this, "BackgroundMCParticleCollectionName", "MCParticle",
+      "The name of the MCParticle collection in the background files"};
 
   Gaudi::Property<float> m_deltaT{this, "Delta_t", float(0.5), "Time difference between BXs in the BXtrain"};
 
   mutable std::unique_ptr<OverlayTimingRandomMixNS::EventHolder> m_bkgEvents{};
 
-  Gaudi::Property<std::map<std::string, std::vector<float>>> m_timeWindows{this, "TimeWindows", std::map<std::string, std::vector<float>>(), "Time windows for the different collections"};
-  Gaudi::Property<bool> m_allowReusingBackgroundFiles{this, "AllowReusingBackgroundFiles", false, "If true the same background file can be used for the same event"};
-  Gaudi::Property<bool> m_copyCellIDMetadata{this, "CopyCellIDMetadata", false, "If metadata is found in the signal file, copy it to the output file, replacing the old names with the new names"};
+  Gaudi::Property<std::map<std::string, std::vector<float>>> m_timeWindows{
+      this, "TimeWindows", std::map<std::string, std::vector<float>>(), "Time windows for the different collections"};
+  Gaudi::Property<bool> m_allowReusingBackgroundFiles{
+      this, "AllowReusingBackgroundFiles", false, "If true the same background file can be used for the same event"};
+  Gaudi::Property<bool> m_copyCellIDMetadata{this, "CopyCellIDMetadata", false,
+                                             "If metadata is found in the signal file, copy it to the output file, "
+                                             "replacing the old names with the new names"};
 
   Gaudi::Property<bool> m_mergeMCParticles{this, "MergeMCParticles", true, "Merge the MC Particle collections"};
 
 private:
   inline static thread_local std::mt19937 m_engine;
-  SmartIF<IUniqueIDGenSvc>                m_uidSvc;
+  SmartIF<IUniqueIDGenSvc> m_uidSvc;
 };

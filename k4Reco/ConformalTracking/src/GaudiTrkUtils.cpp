@@ -384,7 +384,7 @@ int GaudiTrkUtils::finaliseLCIOTrack(GaudiDDKalTestTrack& marlintrk, edm4hep::Mu
     return_error = marlintrk.getTrackState(last_constrained_hit, ts, chi2, ndf);
     if (return_error != 0) {
       m_thisAlg->debug() << "GaudiTrk::finaliseLCIOTrack: could not get TrackState at last constrained hit "
-                        << last_constrained_hit << endmsg;
+                         << last_constrained_hit << endmsg;
       return return_error;
     }
 
@@ -395,7 +395,7 @@ int GaudiTrkUtils::finaliseLCIOTrack(GaudiDDKalTestTrack& marlintrk, edm4hep::Mu
     return_error = mTrk->addHit(last_constrained_hit);
     if (return_error != 0) {
       m_thisAlg->debug() << "MarlinTrk::finaliseLCIOTrack: could not add last constrained hit to temporary track "
-                        << last_constrained_hit << endmsg;
+                         << last_constrained_hit << endmsg;
       return return_error;
     }
     return_error = mTrk->initialise(ts, fit_direction);

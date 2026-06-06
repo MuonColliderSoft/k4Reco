@@ -54,28 +54,28 @@
 #include <vector>
 
 namespace OverlayTimingNS {
-  struct EventHolder {
-    std::vector<std::vector<std::string>> m_fileNames;
-    std::vector<podio::Reader> m_rootFileReaders;
-    std::vector<size_t> m_totalNumberOfEvents;
-    std::map<int, podio::Frame> m_events;
-    std::vector<size_t> m_nextEntry;
+struct EventHolder {
+  std::vector<std::vector<std::string>> m_fileNames;
+  std::vector<podio::Reader> m_rootFileReaders;
+  std::vector<size_t> m_totalNumberOfEvents;
+  std::map<int, podio::Frame> m_events;
+  std::vector<size_t> m_nextEntry;
 
-    EventHolder(const std::vector<std::vector<std::string>>& fileNames) : m_fileNames(fileNames) {
-      for (auto& names : m_fileNames) {
-        m_rootFileReaders.emplace_back(podio::makeReader(names));
-        m_totalNumberOfEvents.push_back(m_rootFileReaders.back().getEntries("events"));
-      }
-      m_nextEntry.resize(m_fileNames.size(), 0);
+  EventHolder(const std::vector<std::vector<std::string>>& fileNames) : m_fileNames(fileNames) {
+    for (auto& names : m_fileNames) {
+      m_rootFileReaders.emplace_back(podio::makeReader(names));
+      m_totalNumberOfEvents.push_back(m_rootFileReaders.back().getEntries("events"));
     }
-    EventHolder() = default;
+    m_nextEntry.resize(m_fileNames.size(), 0);
+  }
+  EventHolder() = default;
 
-    // TODO: Cache functionality
-    // podio::Frame& read
+  // TODO: Cache functionality
+  // podio::Frame& read
 
-    size_t size() const { return m_fileNames.size(); }
-  };
-}
+  size_t size() const { return m_fileNames.size(); }
+};
+} // namespace OverlayTimingNS
 
 using retType =
     std::tuple<edm4hep::MCParticleCollection, std::vector<edm4hep::SimTrackerHitCollection>,

@@ -66,10 +66,9 @@ StatusCode RefitFinal::initialize() {
   return StatusCode::SUCCESS;
 }
 
-std::tuple<edm4hep::TrackCollection, edm4hep::TrackMCParticleLinkCollection> RefitFinal::operator()(
-  const edm4hep::TrackCollection& input_track_col,
-  const std::vector<const edm4hep::TrackMCParticleLinkCollection*>& input_rel_col
-) const {
+std::tuple<edm4hep::TrackCollection, edm4hep::TrackMCParticleLinkCollection>
+RefitFinal::operator()(const edm4hep::TrackCollection& input_track_col,
+                       const std::vector<const edm4hep::TrackMCParticleLinkCollection*>& input_rel_col) const {
   // establish the track collection that will be created
   edm4hep::TrackCollection trackVec;
   edm4hep::TrackMCParticleLinkCollection trackRelationCollection;
@@ -119,7 +118,6 @@ std::tuple<edm4hep::TrackCollection, edm4hep::TrackMCParticleLinkCollection> Ref
       ++hitInSubDet[m_encoder.get(ptr->getCellID(), "system")];
     }
 
-
     edm4hep::MutableTrack edm4hep_trk = trackVec.create();
 
     edm4hep::CovMatrix6f initialCov;
@@ -131,17 +129,11 @@ std::tuple<edm4hep::TrackCollection, edm4hep::TrackMCParticleLinkCollection> Ref
 
     const bool fit_direction = m_extrapolateForward;
 
-    GaudiTrkUtils trkUtils(
-      static_cast<const Gaudi::Algorithm*>(this), 
-      m_ddkaltest, m_geoSvc, 
-      m_encodingStringVariable.value()
-    );
+    GaudiTrkUtils trkUtils(static_cast<const Gaudi::Algorithm*>(this), m_ddkaltest, m_geoSvc,
+                           m_encodingStringVariable.value());
 
-    int return_code = trkUtils.createFinalisedLCIOTrack(
-      gaudi_trk, trkHitsPtr, edm4hep_trk, 
-      fit_direction, initialCov, m_bField, 
-      m_Max_Chi2_Incr.value()
-    );
+    int return_code = trkUtils.createFinalisedLCIOTrack(gaudi_trk, trkHitsPtr, edm4hep_trk, fit_direction, initialCov,
+                                                        m_bField, m_Max_Chi2_Incr.value());
 
     if (return_code != 0) {
       debug() << "finaliseLCIOTrack failed" << endmsg;
@@ -216,8 +208,8 @@ std::tuple<edm4hep::TrackCollection, edm4hep::TrackMCParticleLinkCollection> Ref
     }
   } // for loop to the tracks
 
-  debug() << "Final number of Tracks after refit = " << trackVec.size()
-          << " Number of discarded Tracks = " << counter << endmsg;
+  debug() << "Final number of Tracks after refit = " << trackVec.size() << " Number of discarded Tracks = " << counter
+          << endmsg;
 
   return std::make_tuple(std::move(trackVec), std::move(trackRelationCollection));
 }

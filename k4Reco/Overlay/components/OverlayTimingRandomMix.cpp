@@ -32,35 +32,29 @@
 
 #include <TMath.h>
 
+#include <filesystem>
 #include <future>
 #include <random>
 #include <utility>
 #include <vector>
-#include <filesystem>
 namespace fs = std::filesystem;
 
-std::vector<std::string> filesInFolder(const std::string &folderPath)
-{
+std::vector<std::string> filesInFolder(const std::string& folderPath) {
   std::vector<std::string> files;
-  try
-  {
-    for (const auto &entry : fs::directory_iterator(folderPath))
-    {
-      if (fs::is_regular_file(entry.path()) && entry.path().extension() == ".root")
-      {
+  try {
+    for (const auto& entry : fs::directory_iterator(folderPath)) {
+      if (fs::is_regular_file(entry.path()) && entry.path().extension() == ".root") {
         files.push_back(entry.path().string());
       }
     }
-  }
-  catch (const std::exception &ex)
-  {
+  } catch (const std::exception& ex) {
     std::cerr << "Error: " << ex.what() << std::endl;
   }
   return files;
 }
 
-
-template <typename T> inline float time_of_flight(const T& pos) {
+template <typename T>
+inline float time_of_flight(const T& pos) {
   // Returns the time of flight to the radius in ns
   // Assumming positions in mm, then mm/m/s = 10^-3 s = 10^6 ns
   return std::sqrt((pos[0] * pos[0]) + (pos[1] * pos[1]) + (pos[2] * pos[2])) / TMath::C() * 1e6;
@@ -105,9 +99,9 @@ StatusCode OverlayTimingRandomMix::initialize() {
       }
     }
     if (std::any_of(valset.begin(), valset.end(),
-                  [this](const int& val) { return this->m_startWithBackgroundEvent >= val; })) {
-      throw GaudiException("StartWithBackgroundEvent is larger than the number of events in the background files", name(),
-                         StatusCode::FAILURE);
+                    [this](const int& val) { return this->m_startWithBackgroundEvent >= val; })) {
+      throw GaudiException("StartWithBackgroundEvent is larger than the number of events in the background files",
+                           name(), StatusCode::FAILURE);
     }
   }
 
@@ -128,19 +122,19 @@ StatusCode OverlayTimingRandomMix::initialize() {
   return StatusCode::SUCCESS;
 }
 
-retType OverlayTimingRandomMix::operator()(
-  const edm4hep::EventHeaderCollection&                           headers,
-  const edm4hep::MCParticleCollection&                            particles,
-  const std::vector<const edm4hep::SimTrackerHitCollection*>&     simTrackerHits,
-  const std::vector<const edm4hep::SimCalorimeterHitCollection*>& simCaloHits) const {
-  
+retType
+OverlayTimingRandomMix::operator()(const edm4hep::EventHeaderCollection& headers,
+                                   const edm4hep::MCParticleCollection& particles,
+                                   const std::vector<const edm4hep::SimTrackerHitCollection*>& simTrackerHits,
+                                   const std::vector<const edm4hep::SimCalorimeterHitCollection*>& simCaloHits) const {
+
   const auto seed = m_uidSvc->getUniqueID(headers[0].getEventNumber(), headers[0].getRunNumber(), this->name());
   m_engine.seed(seed);
 
   // Output collections
-  auto oparticles       = edm4hep::MCParticleCollection();
-  auto osimTrackerHits  = std::vector<edm4hep::SimTrackerHitCollection>();
-  auto osimCaloHits     = std::vector<edm4hep::SimCalorimeterHitCollection>();
+  auto oparticles = edm4hep::MCParticleCollection();
+  auto osimTrackerHits = std::vector<edm4hep::SimTrackerHitCollection>();
+  auto osimCaloHits = std::vector<edm4hep::SimCalorimeterHitCollection>();
   auto ocaloHitContribs = std::vector<edm4hep::CaloHitContributionCollection>();
   for (size_t i = 0; i < simCaloHits.size(); ++i) {
     ocaloHitContribs.emplace_back(edm4hep::CaloHitContributionCollection());
@@ -162,10 +156,10 @@ retType OverlayTimingRandomMix::operator()(
 
   // Copy the SimTrackerHits and crop them
   for (size_t i = 0; i < simTrackerHits.size(); ++i) {
-    const auto& coll                   = simTrackerHits[i];
-    const auto  name                   = inputLocations(SIMTRACKERHIT_INDEX_POSITION)[i];
+    const auto& coll = simTrackerHits[i];
+    const auto name = inputLocations(SIMTRACKERHIT_INDEX_POSITION)[i];
     const auto [this_start, this_stop] = define_time_windows(name);
-    auto ocoll                         = edm4hep::SimTrackerHitCollection();
+    auto ocoll = edm4hep::SimTrackerHitCollection();
     for (const auto&& simTrackerHit : *coll) {
       const float tof = time_of_flight(simTrackerHit.getPosition());
       if ((simTrackerHit.getTime() > this_start + tof) && (simTrackerHit.getTime() < this_stop + tof)) {
@@ -181,14 +175,14 @@ retType OverlayTimingRandomMix::operator()(
   // Copy the SimCalorimeterHits and crop them together with the contributions
   std::map<int, std::map<uint64_t, edm4hep::MutableSimCalorimeterHit>> cellIDsMap;
   for (size_t i = 0; i < simCaloHits.size(); ++i) {
-    const auto& coll                   = simCaloHits[i];
-    const auto  name                   = inputLocations(SIMCALOHIT_INDEX_POSITION)[i];
+    const auto& coll = simCaloHits[i];
+    const auto name = inputLocations(SIMCALOHIT_INDEX_POSITION)[i];
     const auto [this_start, this_stop] = define_time_windows(name);
-    auto& calHitMap                    = cellIDsMap[i];
-    auto& caloHitContribs              = ocaloHitContribs[i];
+    auto& calHitMap = cellIDsMap[i];
+    auto& caloHitContribs = ocaloHitContribs[i];
     for (const auto&& simCaloHit : *coll) {
-      const float      tof                = time_of_flight(simCaloHit.getPosition());
-      bool             within_time_window = false;
+      const float tof = time_of_flight(simCaloHit.getPosition());
+      bool within_time_window = false;
       std::vector<int> thisContribs;
       for (const auto& contrib : simCaloHit.getContributions()) {
         if (!((contrib.getTime() > this_start + tof) && (contrib.getTime() < this_stop + tof)))
@@ -219,13 +213,13 @@ retType OverlayTimingRandomMix::operator()(
 
     // define a permutation for the events to overlay -- the physics event is per definition at position 0
     std::vector<int> permutation;
-    std::vector<int> v_file_indices(m_bkgEvents->m_fileNames[groupIndex].size());           // vector of indices
+    std::vector<int> v_file_indices(m_bkgEvents->m_fileNames[groupIndex].size()); // vector of indices
 
     // Permutation has negative values and the last one is 0
     // if (!m_randomBX) then m_physBX (default = 1)
     for (int i = -(m_physBX - 1); i < m_NBunchTrain - (m_physBX - 1); ++i) {
       permutation.push_back(i);
-    }    
+    }
     std::iota(std::begin(v_file_indices), std::end(v_file_indices), 0); // Fill with 0, 1, ...
     std::shuffle(permutation.begin(), permutation.end(), m_engine);
     std::shuffle(v_file_indices.begin(), v_file_indices.end(), m_engine);
@@ -274,12 +268,12 @@ retType OverlayTimingRandomMix::operator()(
         }
 
         // To fix the relations we will need to have a map from old to new particle index
-        std::map<int, int>                                           oldToNewMap;
+        std::map<int, int> oldToNewMap;
         std::map<int, std::pair<std::vector<int>, std::vector<int>>> parentDaughterMap;
 
         if (m_mergeMCParticles) {
           const auto& bgParticles = backgroundEvent.get<edm4hep::MCParticleCollection>(m_MCParticleCollectionName);
-          int         j           = oparticles.size();
+          int j = oparticles.size();
           for (size_t i = 0; i < bgParticles.size(); ++i) {
             auto npart = bgParticles[i].clone(false);
 
@@ -345,7 +339,7 @@ retType OverlayTimingRandomMix::operator()(
               if (mcp.isAvailable()) {
                 // Preserve Momentum
                 edm4hep::Vector3d mom = mcp.getMomentum();
-                nhit.setMomentum({(float)mom.x, (float)mom.y, (float)mom.z}); 
+                nhit.setMomentum({(float)mom.x, (float)mom.y, (float)mom.z});
               }
             }
             ocoll.push_back(nhit);
@@ -366,13 +360,13 @@ retType OverlayTimingRandomMix::operator()(
             continue;
           }
 
-          auto& calHitMap      = cellIDsMap[i];
+          auto& calHitMap = cellIDsMap[i];
           auto& calHitContribs = ocaloHitContribs[i];
           for (const auto&& simCaloHit : backgroundEvent.get<edm4hep::SimCalorimeterHitCollection>(name)) {
             if (calHitMap.find(simCaloHit.getCellID()) == calHitMap.end()) {
               // There is no hit at this position. The new hit can be added, if it is not outside the window
               auto calhit = edm4hep::MutableSimCalorimeterHit();
-              bool add    = false;
+              bool add = false;
               for (const auto& contrib : simCaloHit.getContributions()) {
                 if ((contrib.getTime() + timeOffset > this_start) && (contrib.getTime() + timeOffset < this_stop)) {
                   add = true;
@@ -428,12 +422,15 @@ retType OverlayTimingRandomMix::operator()(
     osimCaloHits.emplace_back(std::move(ocoll));
   }
 
-  debug() << "\n\t\tCollection\t\t|\t\tPre BIB\t\t|\t\tPost BIB\t\t\n--------------------------------------------------------------------------\n";
+  debug() << "\n\t\tCollection\t\t|\t\tPre BIB\t\t|\t\tPost "
+             "BIB\t\t\n--------------------------------------------------------------------------\n";
   for (int trkCol = 0; trkCol < simTrackerHits.size(); trkCol++) {
-    debug() << "\tTrackerHits " << trkCol << "\t|\t\t" << simTrackerHits[trkCol]->size() << "\t\t|\t\t" << osimTrackerHits[trkCol].size() << "\n";
+    debug() << "\tTrackerHits " << trkCol << "\t|\t\t" << simTrackerHits[trkCol]->size() << "\t\t|\t\t"
+            << osimTrackerHits[trkCol].size() << "\n";
   }
   for (int calCol = 0; calCol < simCaloHits.size(); calCol++) {
-    debug() << "\tCaloHits " << calCol << "\t|\t\t" << simCaloHits[calCol]->size() << "\t\t|\t\t" << osimCaloHits[calCol].size() << "\n";
+    debug() << "\tCaloHits " << calCol << "\t|\t\t" << simCaloHits[calCol]->size() << "\t\t|\t\t"
+            << osimCaloHits[calCol].size() << "\n";
   }
   debug() << endmsg;
 
