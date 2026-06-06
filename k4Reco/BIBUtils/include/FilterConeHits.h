@@ -67,11 +67,10 @@ using StaticRootHistogram =
  *  @author M. Casarsa, INFN Trieste (original Marlin processor)
  */
 struct FilterConeHits final
-    : k4FWCore::MultiTransformer<
-          std::tuple<edm4hep::TrackerHitPlaneCollection, edm4hep::SimTrackerHitCollection,
-                     edm4hep::TrackerHitSimTrackerHitLinkCollection>(
-              const edm4hep::MCParticleCollection&, const edm4hep::TrackerHitPlaneCollection&,
-              const edm4hep::TrackerHitSimTrackerHitLinkCollection&)> {
+    : k4FWCore::MultiTransformer<std::tuple<edm4hep::TrackerHitPlaneCollection, edm4hep::SimTrackerHitCollection,
+                                            edm4hep::TrackerHitSimTrackerHitLinkCollection>(
+          const edm4hep::MCParticleCollection&, const edm4hep::TrackerHitPlaneCollection&,
+          const edm4hep::TrackerHitSimTrackerHitLinkCollection&)> {
   FilterConeHits(const std::string& name, ISvcLocator* svcLoc);
 
   StatusCode initialize() override;
@@ -89,8 +88,8 @@ private:
   Gaudi::Property<std::vector<int>> m_coneAroundStatus{
       this, "ConeAroundStatus", {1}, "List of MC particle generator statuses to build cones around"};
   Gaudi::Property<bool> m_fillHistos{this, "FillHistograms", false, "Flag to fill the diagnostic histograms"};
-  Gaudi::Property<double> m_trackerOuterRadius{
-      this, "TrackerOuterRadius", 1500., "Outer radius of the tracker barrel used to clip the helix [mm]"};
+  Gaudi::Property<double> m_trackerOuterRadius{this, "TrackerOuterRadius", 1500.,
+                                               "Outer radius of the tracker barrel used to clip the helix [mm]"};
   Gaudi::Property<std::string> m_geoSvcName{this, "GeoSvcName", "GeoSvc", "The name of the GeoSvc instance"};
 
   SmartIF<IGeoSvc> m_geoSvc;

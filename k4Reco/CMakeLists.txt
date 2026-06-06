@@ -132,10 +132,6 @@ set(k4RecoPlugins_public_includes
 
 target_include_directories(k4RecoPlugins PUBLIC ${k4RecoPlugins_public_includes})
 
-# MarlinUtil provides HelixClass_double as a header-only template, used by the
-# BIB cone filter (FilterConeHits). Only the headers are needed, not the library.
-target_include_directories(k4RecoPlugins PRIVATE ${MarlinUtil_INCLUDE_DIRS})
-
 if(BUILD_TRACKING)
   target_include_directories(k4RecoPlugins
     PUBLIC

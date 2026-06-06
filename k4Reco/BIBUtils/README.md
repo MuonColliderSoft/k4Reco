@@ -20,9 +20,13 @@ relying on positional alignment between the hit and relation collections.
 Keeps the tracker hits that lie inside a cone around the trajectory of a
 generator-level MC particle. For each selected MC particle a helix is built from
 its production vertex, momentum and charge in the detector field (taken from the
-`GeoSvc`), using `HelixClass_double` from MarlinUtil (header-only). A hit is kept
-when its angular distance to the helix is below `DeltaRCut` and/or its 3D
-distance to the helix is below `Dist3DCut`.
+`GeoSvc`). A hit is kept when its angular distance to the helix is below
+`DeltaRCut` and/or its 3D distance to the helix is below `Dist3DCut`.
+
+The helix math lives in the self-contained, header-only `TrackHelix` (see
+`include/TrackHelix.h`); it reproduces the point-to-helix distance and
+cylinder-crossing operations of MarlinUtil's `HelixClass` so the package carries
+no dependency on MarlinUtil or any other Marlin-era package.
 
 Each instance handles a single tracker subdetector — configure one instance per
 collection (vertex/inner/outer × barrel/endcap), as in the original steering.

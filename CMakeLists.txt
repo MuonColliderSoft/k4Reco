@@ -40,8 +40,6 @@ find_package(k4SimGeant4 REQUIRED)
 find_package(k4geo REQUIRED)
 find_package(CLHEP REQUIRED)
 find_package(FastJet REQUIRED)
-# MarlinUtil is used header-only (HelixClass_double) by the BIB cone filter
-find_package(MarlinUtil REQUIRED)
 include(cmake/Key4hepConfig.cmake)
 
 include(GNUInstallDirs)

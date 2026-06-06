@@ -52,8 +52,9 @@ class TH2D;
  *  @author F. Meloni, DESY (original Marlin processor)
  */
 struct CaloHitSelector final
-    : k4FWCore::MultiTransformer<std::tuple<edm4hep::CalorimeterHitCollection, edm4hep::CaloHitSimCaloHitLinkCollection>(
-          const edm4hep::CalorimeterHitCollection&, const edm4hep::CaloHitSimCaloHitLinkCollection&)> {
+    : k4FWCore::MultiTransformer<
+          std::tuple<edm4hep::CalorimeterHitCollection, edm4hep::CaloHitSimCaloHitLinkCollection>(
+              const edm4hep::CalorimeterHitCollection&, const edm4hep::CaloHitSimCaloHitLinkCollection&)> {
   CaloHitSelector(const std::string& name, ISvcLocator* svcLoc);
 
   StatusCode initialize() override;

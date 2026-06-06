@@ -19,13 +19,12 @@
 #include "FilterConeHits.h"
 
 #include "BIBUtilsHelpers.h"
+#include "TrackHelix.h"
 
 #include <edm4hep/SimTrackerHit.h>
 
 #include "DD4hep/DD4hepUnits.h"
 #include "DD4hep/Detector.h"
-
-#include "marlinutil/HelixClass_double.h"
 
 #include <algorithm>
 #include <cmath>
@@ -33,6 +32,7 @@
 #include <unordered_set>
 
 using k4reco::bibutils::objectKey;
+using k4reco::bibutils::TrackHelix;
 
 FilterConeHits::FilterConeHits(const std::string& name, ISvcLocator* svcLoc)
     : MultiTransformer(name, svcLoc,
@@ -56,12 +56,12 @@ StatusCode FilterConeHits::initialize() {
   m_bField = bfield[2] / dd4hep::tesla;
   info() << "Magnetic field at the origin: Bz = " << m_bField << " T" << endmsg;
 
-  m_histograms[hDistXY].reset(
-      new Gaudi::Accumulators::StaticRootHistogram<1>{this, "distXY", "hit-to-helix XY distance;d_{XY} [mm]", {1000, 0., 1000.}});
-  m_histograms[hDistZ].reset(
-      new Gaudi::Accumulators::StaticRootHistogram<1>{this, "distZ", "hit-to-helix Z distance;d_{Z} [mm]", {1000, 0., 1000.}});
-  m_histograms[hDist3D].reset(
-      new Gaudi::Accumulators::StaticRootHistogram<1>{this, "dist3D", "hit-to-helix 3D distance;d_{3D} [mm]", {1000, 0., 1000.}});
+  m_histograms[hDistXY].reset(new Gaudi::Accumulators::StaticRootHistogram<1>{
+      this, "distXY", "hit-to-helix XY distance;d_{XY} [mm]", {1000, 0., 1000.}});
+  m_histograms[hDistZ].reset(new Gaudi::Accumulators::StaticRootHistogram<1>{
+      this, "distZ", "hit-to-helix Z distance;d_{Z} [mm]", {1000, 0., 1000.}});
+  m_histograms[hDist3D].reset(new Gaudi::Accumulators::StaticRootHistogram<1>{
+      this, "dist3D", "hit-to-helix 3D distance;d_{3D} [mm]", {1000, 0., 1000.}});
   m_histograms[hAngle].reset(new Gaudi::Accumulators::StaticRootHistogram<1>{
       this, "angle", "angle between hit and particle;angle [rad]", {1000, 0., 1.}});
   m_histograms[hTime].reset(new Gaudi::Accumulators::StaticRootHistogram<1>{
@@ -106,13 +106,12 @@ FilterConeHits::operator()(const edm4hep::MCParticleCollection& mcParticles,
     double vertex[3] = {vtx.x, vtx.y, vtx.z};
     const double partP = std::sqrt(mom.x * mom.x + mom.y * mom.y + mom.z * mom.z);
 
-    HelixClass_double helix;
-    helix.Initialize_VP(vertex, momentum, static_cast<double>(part.getCharge()), m_bField);
+    TrackHelix helix;
+    helix.initialize(vertex, momentum, static_cast<double>(part.getCharge()), m_bField);
 
     // Intersection of the helix with the tracker outer cylinder. If the particle
     // spirals and never reaches it, getPointOnCircle returns -1e20.
-    double intersectionPoint[3] = {0., 0., 0.};
-    const double intersectionTime = helix.getPointOnCircle(m_trackerOuterRadius, vertex, intersectionPoint);
+    const double intersectionTime = helix.getPointOnCircle(m_trackerOuterRadius, vertex);
 
     for (const auto& hit : trackerHits) {
       const std::uint64_t key = objectKey(hit.getObjectID());
