@@ -101,38 +101,41 @@ int GaudiDDKalTestTrack::addHit(const edm4hep::TrackerHit* trkhit) {
   return this->addHit(trkhit, m_ktest->findMeasLayer(*trkhit));
 }
 
+DDVTrackHit* GaudiDDKalTestTrack::convertToKalHit(const edm4hep::TrackerHit* trkhit, const DDVMeasLayer* ml) {
+  // TODO: a LCIO hit has to be created because it's needed downstream
+  if (!trkhit->isA<edm4hep::TrackerHitPlane>()) {
+    throw std::runtime_error(
+        "GaudiDDKalTestTrack::convertToKalHit - trkhit is not a TrackerHitPlane, this is not implemented yet");
+  }
+  auto hit = IMPL::TrackerHitPlaneImpl();
+  double pos[3] = {trkhit->getPosition()[0], trkhit->getPosition()[1], trkhit->getPosition()[2]};
+  hit.setPosition(pos);
+  hit.setCellID0(trkhit->getCellID());
+  hit.setdU(trkhit->as<edm4hep::TrackerHitPlane>().getDu());
+  hit.setdV(trkhit->as<edm4hep::TrackerHitPlane>().getDv());
+
+  // Not needed
+  // hit.setCovMatrix(lcioCov);
+  // static_cast<IMPL::TrackerHitImpl*>(static_cast<EVENT::TrackerHit*>(hit))->setCovMatrix(lcioCov);
+  // hit.setQuality(trkhit->getQuality());
+  // hit.setType(trkhit->getType());
+  // hit.setEDep(trkhit->getEDep());
+  // hit.setEDepError(trkhit->getEDepError());
+  // float u[2] = {trkhit->getU()[0], trkhit->getU()[1]};
+  // hit.setU(u);
+  // float v[2] = {trkhit->getV()[0], trkhit->getV()[1]};
+  // hit.setV(v);
+  // hit.setTime(trkhit->getTime());
+
+  return ml->ConvertLCIOTrkHit(&hit);
+}
+
 int GaudiDDKalTestTrack::addHit(const edm4hep::TrackerHit* trkhit, const DDVMeasLayer* ml) {
   m_thisAlg->debug() << "GaudiDDKalTestTrack::addHit: trkhit = " << trkhit->id() << " addr: " << trkhit
                      << " ml = " << ml << endmsg;
 
   if (trkhit && ml) {
-    // TODO: a LCIO hit has to be created because it's needed downstream
-    if (!trkhit->isA<edm4hep::TrackerHitPlane>()) {
-      throw std::runtime_error(
-          "GaudiDDKalTestTrack::addHit - trkhit is not a TrackerHitPlane, this is not implemented yet");
-    }
-    auto hit = IMPL::TrackerHitPlaneImpl();
-    double pos[3] = {trkhit->getPosition()[0], trkhit->getPosition()[1], trkhit->getPosition()[2]};
-    hit.setPosition(pos);
-    hit.setCellID0(trkhit->getCellID());
-    hit.setdU(trkhit->as<edm4hep::TrackerHitPlane>().getDu());
-    hit.setdV(trkhit->as<edm4hep::TrackerHitPlane>().getDv());
-
-    // Not needed
-    // hit.setCovMatrix(lcioCov);
-    // static_cast<IMPL::TrackerHitImpl*>(static_cast<EVENT::TrackerHit*>(hit))->setCovMatrix(lcioCov);
-    // hit.setQuality(trkhit->getQuality());
-    // hit.setType(trkhit->getType());
-    // hit.setEDep(trkhit->getEDep());
-    // hit.setEDepError(trkhit->getEDepError());
-    // float u[2] = {trkhit->getU()[0], trkhit->getU()[1]};
-    // hit.setU(u);
-    // float v[2] = {trkhit->getV()[0], trkhit->getV()[1]};
-    // hit.setV(v);
-    // hit.setTime(trkhit->getTime());
-
-    auto* kalhit = ml->ConvertLCIOTrkHit(&hit);
-    return this->addHit(trkhit, kalhit, ml);
+    return this->addHit(trkhit, convertToKalHit(trkhit, ml), ml);
   } else {
     m_thisAlg->warning() << " GaudiDDKalTestTrack::addHit - bad inputs " << trkhit << " ml : " << ml << endmsg;
     return 1;
@@ -432,7 +435,13 @@ int GaudiDDKalTestTrack::addAndFit(const edm4hep::TrackerHit* trkhit, double& ch
     return 1;
   }
 
-  auto* kalhit = (*m_edm4hep_hits_to_kaltest_hits)[trkhit];
+  // Reuse the kaltest hit if this hit was already added to the track; otherwise
+  // build it fresh (as the original MarlinTrk addAndFit does). The previous code
+  // only looked it up in the map, which fails for hits that were never addHit()'d
+  // to this track -- e.g. the inner hits re-added to the temporary track used to
+  // propagate to the IP in finaliseLCIOTrack(), causing "could not add inner hit".
+  auto hitIt = m_edm4hep_hits_to_kaltest_hits->find(trkhit);
+  DDVTrackHit* kalhit = (hitIt != m_edm4hep_hits_to_kaltest_hits->end()) ? hitIt->second : convertToKalHit(trkhit, ml);
 
   if (!kalhit) { // fg: ml->ConvertLCIOTrkHit returns 0 if hit not on surface !!!
     return 1;

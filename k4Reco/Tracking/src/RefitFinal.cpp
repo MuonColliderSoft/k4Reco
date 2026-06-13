@@ -118,7 +118,10 @@ RefitFinal::operator()(const edm4hep::TrackCollection& input_track_col,
       ++hitInSubDet[m_encoder.get(ptr->getCellID(), "system")];
     }
 
-    edm4hep::MutableTrack edm4hep_trk = trackVec.create();
+    // Build the refitted track standalone and only add it to the output
+    // collection once it passes every cut below, so that failed or discarded
+    // refits do not leak empty (zero-state) tracks into the output collection.
+    edm4hep::MutableTrack edm4hep_trk;
 
     edm4hep::CovMatrix6f initialCov;
     initialCov[0] = m_initialTrackError_d0;
@@ -199,6 +202,9 @@ RefitFinal::operator()(const edm4hep::TrackCollection& input_track_col,
       ++counter;
       continue;
     }
+
+    // Track passed all cuts: now add it to the output collection.
+    trackVec.push_back(edm4hep_trk);
 
     // create the Track-MCParticle relation
     if (trackIndexToMCParticle.find(static_cast<int>(track.getObjectID().index)) != trackIndexToMCParticle.end()) {

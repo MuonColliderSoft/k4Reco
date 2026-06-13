@@ -202,6 +202,11 @@ public:
     return phi;
   }
 
+  // Convert an edm4hep TrackerHit(Plane) into a freshly allocated kaltest hit on
+  // the given measurement layer (caller owns the result). Shared by addHit() and
+  // addAndFit() so both build the kaltest hit the same way.
+  DDVTrackHit* convertToKalHit(const edm4hep::TrackerHit* trkhit, const DDVMeasLayer* ml);
+
   std::unique_ptr<TKalTrack> m_kaltrack{}; // unique ptr to be able to forward declare
   TObjArray* m_kalhits = nullptr;
   GaudiDDKalTest* m_ktest = nullptr;
