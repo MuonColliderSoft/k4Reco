@@ -72,9 +72,6 @@ if(BUILD_TRACKING)
     ${DDKalTest_LIBRARIES}
   )
 
-  # Needed for the warnings in KalTest
-  target_compile_options(GaudiTrkUtils PRIVATE "-Wno-error=deprecated-copy")
-
   target_sources(GaudiTrkUtils
     PUBLIC FILE_SET headers
     TYPE HEADERS FILES
@@ -86,7 +83,12 @@ if(BUILD_TRACKING)
   target_include_directories(GaudiTrkUtils PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/GaudiTrkUtils/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
+  )
+
+  # KalTest/DDKalTest/streamlog headers emit -Wdeprecated-copy warnings of their
+  # own; include them as SYSTEM so those upstream warnings are suppressed without
+  # hiding warnings in our own code.
+  target_include_directories(GaudiTrkUtils SYSTEM PRIVATE
     ${KalTest_INCLUDE_DIRS}
     ${DDKalTest_INCLUDE_DIRS}
     ${streamlog_INCLUDE_DIRS}
@@ -127,10 +129,13 @@ set(k4RecoPlugins_public_includes
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/CaloDigi/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/FastJet/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/BIBUtils/include>
-  ${FASTJET_INCLUDE_DIRS}
 )
 
 target_include_directories(k4RecoPlugins PUBLIC ${k4RecoPlugins_public_includes})
+
+# FastJet headers emit -Wdeprecated-copy warnings of their own; include them as
+# SYSTEM so those upstream warnings are suppressed.
+target_include_directories(k4RecoPlugins SYSTEM PUBLIC ${FASTJET_INCLUDE_DIRS})
 
 if(BUILD_TRACKING)
   target_include_directories(k4RecoPlugins
@@ -138,7 +143,10 @@ if(BUILD_TRACKING)
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/ConformalTracking/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/Tracking/include>
     ${k4RecoPlugins_public_includes}
-    PRIVATE
+  )
+  # KalTest/DDKalTest/streamlog headers emit -Wdeprecated-copy warnings of their
+  # own; include them as SYSTEM so those upstream warnings are suppressed.
+  target_include_directories(k4RecoPlugins SYSTEM PRIVATE
     ${KalTest_INCLUDE_DIRS}
     ${DDKalTest_INCLUDE_DIRS}
     ${streamlog_INCLUDE_DIRS}
