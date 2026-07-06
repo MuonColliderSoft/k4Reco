@@ -50,6 +50,7 @@ if(BUILD_TESTING)
 endif()
 
 add_subdirectory(python)
+add_subdirectory(data)
 
 include(cmake/CreateProjectConfig.cmake)
 include(cmake/FindFastJet.cmake)
