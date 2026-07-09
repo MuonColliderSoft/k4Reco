@@ -49,8 +49,8 @@
  *
  *  @author F. Gaede, DESY (original Marlin processor)
  */
-struct SplitCollectionByLayer final
-    : k4FWCore::Transformer<std::vector<edm4hep::TrackerHitPlaneCollection>(const edm4hep::TrackerHitPlaneCollection&)> {
+struct SplitCollectionByLayer final : k4FWCore::Transformer<std::vector<edm4hep::TrackerHitPlaneCollection>(
+                                          const edm4hep::TrackerHitPlaneCollection&)> {
   SplitCollectionByLayer(const std::string& name, ISvcLocator* svcLoc);
 
   StatusCode initialize() override;
