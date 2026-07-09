@@ -24,10 +24,12 @@ in the Muon Collider reconstruction. They were originally Marlin processors:
 | Gaudi algorithm   | Original Marlin processor | Original package |
 |-------------------|---------------------------|------------------|
 | `FilterConeHits`  | `FilterConeHits`          | [MarlinTrkProcessors](https://github.com/MuonColliderSoft/MarlinTrkProcessors) |
+| `SplitCollectionByPolarAngle` | `SplitCollectionByPolarAngle` | [MarlinTrkProcessors](https://github.com/MuonColliderSoft/MarlinTrkProcessors) |
+| `SplitCollectionByLayer` | `SplitCollectionByLayer` | [MarlinTrkProcessors](https://github.com/MuonColliderSoft/MarlinTrkProcessors) |
 | `CaloConer`       | `CaloConer`               | [MyBIBUtils](https://github.com/madbaron/MyBIBUtils) |
 | `CaloHitSelector` | `CaloHitSelector`         | [MyBIBUtils](https://github.com/madbaron/MyBIBUtils) |
 
-All three are functional `k4FWCore::MultiTransformer`s. Selected hits are written
+All of them are functional `k4FWCore::MultiTransformer`s. Selected hits are written
 to **subset** collections that reference the original hits, accompanied by a
 freshly built reco-to-sim link collection. The simulated hit of a given
 reconstructed hit is resolved through the input link collection rather than by
@@ -62,6 +64,53 @@ collection (vertex/inner/outer × barrel/endcap), as in the original steering.
 | `ConeAroundStatus` | `[1]` | MC generator statuses to cone around |
 | `FillHistograms` | `false` | fill diagnostic histograms |
 | `TrackerOuterRadius` | `1500` | tracker barrel outer radius used to clip the helix [mm] |
+
+## SplitCollectionByPolarAngle
+
+Keeps the tracker hits whose polar angle `theta = acos(z/r)` lies inside the
+window `[PolarAngleLowerLimit, PolarAngleUpperLimit]` (given in degrees). Unlike
+`FilterConeHits` this selection is purely geometric and needs neither the MC
+particles nor the detector field, so no `GeoSvc` is required.
+
+Each instance handles a single tracker collection — configure one instance per
+collection, as in the original steering.
+
+| Property | Default | Description |
+|---|---|---|
+| `TrackerHitInputCollections` | `VBTrackerHits` | input reco tracker hits |
+| `TrackerHitInputRelations` | `VBTrackerHitsRelations` | input reco→sim links |
+| `TrackerHitOutputCollections` | `VBTrackerHitsSplit` | output reco hits (subset) |
+| `TrackerSimHitOutputCollections` | `VertexBarrelCollectionSplit` | output sim hits (subset) |
+| `TrackerHitOutputRelations` | `VBTrackerHitsRelationsSplit` | output reco→sim links |
+| `PolarAngleLowerLimit` | `50` | lower limit on the hit polar angle [deg] |
+| `PolarAngleUpperLimit` | `130` | upper limit on the hit polar angle [deg] |
+| `FillHistograms` | `false` | fill diagnostic histograms |
+
+## SplitCollectionByLayer
+
+Splits a single tracker-hit collection into several output collections according
+to the `layer` number decoded from each hit's cellID (via the `GeoSvc` and the
+`GlobalTrackerReadoutID` encoding). Output collection `i` collects the hits whose
+layer lies in the closed interval `[StartLayers[i], EndLayers[i]]`; a hit is
+copied into every output whose interval contains its layer, so overlapping
+intervals duplicate the hit, as in the original processor. The number of output
+collections is arbitrary and follows the length of `OutputCollections`, which
+must match `StartLayers` and `EndLayers`.
+
+Two differences from the Marlin processor: it targets `edm4hep::TrackerHitPlane`
+collections (the original dispatched on the LCIO hit type at run time), and it
+always writes every configured output collection (the `KeepEmptyCollections`
+switch has no equivalent in the functional data flow, where the output handles
+are fixed).
+
+| Property | Default | Description |
+|---|---|---|
+| `InputCollection` | `VBTrackerHits` | input reco tracker hits |
+| `OutputCollections` | `[VBTrackerHitsInner, VBTrackerHitsOuter]` | output reco hits, one subset collection per entry |
+| `StartLayers` | `[]` | first layer (inclusive) routed to each output collection |
+| `EndLayers` | `[]` | last layer (inclusive) routed to each output collection |
+| `EncodingStringParameterName` | `GlobalTrackerReadoutID` | DD4hep constant with the tracker cellID encoding |
+| `GeoSvcName` | `GeoSvc` | name of the GeoSvc instance |
 
 ## CaloConer
 

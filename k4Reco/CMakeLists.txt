@@ -31,6 +31,8 @@ set(sources
   BIBUtils/src/CaloConer.cpp
   BIBUtils/src/CaloHitSelector.cpp
   BIBUtils/src/FilterConeHits.cpp
+  BIBUtils/src/SplitCollectionByPolarAngle.cc
+  BIBUtils/src/SplitCollectionByLayer.cc
 )
 
 if(DEFINED FASTJETPLUGINS_LIBRARY)
