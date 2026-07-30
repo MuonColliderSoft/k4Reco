@@ -96,7 +96,6 @@ CaloHitSelector::operator()(const edm4hep::CalorimeterHitCollection& caloHits,
     const unsigned int layer = bitFieldCoder.get(hit.getCellID(), "layer");
 
     const auto& pos = hit.getPosition();
-    const double r = std::sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z);
 
     // Polar angle, symmetrized around pi/2 to match the threshold maps.
     double hitTheta = std::atan2(std::sqrt(pos.x * pos.x + pos.y * pos.y), static_cast<double>(pos.z));
@@ -127,10 +126,14 @@ CaloHitSelector::operator()(const edm4hep::CalorimeterHitCollection& caloHits,
       continue;
     }
 
-    // Correct the hit time for the time of flight from the origin. This mirrors
-    // the original Marlin processor, which divides the distance by TMath::C().
-    const double timeCorrection = r / TMath::C();
-    const double relativeTime = hit.getTime() - timeCorrection;
+    // The stored hit time is already corrected for the time of flight from
+    // the IP by the digitizer (RealisticCaloDigi with
+    // timingCorrectForPropagation, which keeps the earliest accepted
+    // contribution's corrected time), so it is used directly here.
+    // NB: earlier versions subtracted r/TMath::C() again; with r in mm and
+    // TMath::C() in m/s that term was ~1e-6 ns, i.e. numerically a no-op.
+    // Subtracting a correctly-computed TOF here would double-count it.
+    const double relativeTime = hit.getTime();
     if (relativeTime <= m_timeWindowMin || relativeTime >= m_timeWindowMax) {
       continue;
     }
