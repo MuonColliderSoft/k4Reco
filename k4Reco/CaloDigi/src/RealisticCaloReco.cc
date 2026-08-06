@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <string>
 
@@ -69,7 +70,9 @@ RealisticCaloReco::operator()(const edm4hep::CaloHitSimCaloHitLinkCollection& in
     edm4hep::CalorimeterHit* hit = &hit0;
     edm4hep::MutableCalorimeterHit calhit = newcol.create(); // make new hit
 
-    int cellid = hit->getCellID();
+    // NB: must stay 64-bit - truncating to int drops the cellID fields above
+    // bit 31 (e.g. the x/y cell indices of the MAIA calorimeter encoding)
+    const std::uint64_t cellid = hit->getCellID();
     float energy =
         reconstructEnergy(hit, bitFieldCoder.get(cellid, "layer")); // overloaded method, technology dependent
 
