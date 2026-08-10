@@ -155,7 +155,12 @@ if(BUILD_TRACKING)
   )
 endif()
 
-install(TARGETS GaudiTrkUtils k4RecoPlugins
+set(install_targets k4RecoPlugins)
+if(BUILD_TRACKING)
+  list(APPEND install_targets GaudiTrkUtils)
+endif()
+
+install(TARGETS ${install_targets}
   EXPORT k4RecoTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT bin
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT shlib

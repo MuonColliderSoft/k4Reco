@@ -36,7 +36,11 @@ find_package(DD4hep REQUIRED)
 find_package(Gaudi REQUIRED)
 find_package(k4FWCore REQUIRED)
 find_package(ROOT REQUIRED COMPONENTS RIO Tree Hist)
-find_package(k4geo REQUIRED)
+# NOTE: k4geo is deliberately not looked up here. Nothing in this project
+# includes a k4geo header or links a k4geo:: target; k4geo is a pure runtime
+# dependency, reached through the $K4GEO environment variable that points at the
+# compact files. Requiring it at configure time only inherits k4geo's own
+# transitive dependencies into our build, which we neither use nor want.
 find_package(CLHEP REQUIRED)
 find_package(FastJet REQUIRED)
 include(cmake/Key4hepConfig.cmake)
