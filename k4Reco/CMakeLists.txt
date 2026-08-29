@@ -21,6 +21,7 @@ set(sources
   FastJet/src/FastJetAlg.cpp
   DDPlanarDigi/components/DDPlanarDigi.cpp
   Overlay/components/OverlayTiming.cpp
+  Overlay/components/OverlayTimingRandomEntryMix.cpp
   Overlay/components/OverlayTimingRandomMix.cpp
   CaloDigi/src/RealisticCaloDigiScinPpd.cc
   CaloDigi/src/RealisticCaloDigiSilicon.cc
@@ -167,4 +168,3 @@ install(TARGETS ${install_targets}
   PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   FILE_SET headers DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/k4Reco"
   INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
