@@ -107,7 +107,8 @@ std::vector<size_t> selectEntries(size_t poolSize, size_t count, bool withReplac
 
 namespace OverlayTimingRandomEntryMixNS {
 // Entry-aware reader; all podio and ROOT I/O remains on this worker thread.
-EventReader::EventReader(std::vector<std::vector<std::string>> fileNames) : m_fileNames(std::move(fileNames)) {
+EventReader::EventReader(std::vector<std::vector<std::string>> fileNames, std::vector<bool> oneEntryPerFile)
+    : m_fileNames(std::move(fileNames)), m_oneEntryPerFile(std::move(oneEntryPerFile)) {
   std::promise<void> ready;
   auto readyFuture = ready.get_future();
   m_worker = std::thread([this, ready = std::move(ready)]() mutable { run(std::move(ready)); });
@@ -135,9 +136,16 @@ void EventReader::run(std::promise<void> ready) {
   try {
     m_readers.reserve(m_fileNames.size());
     m_numberOfEntries.reserve(m_fileNames.size());
-    for (const auto& names : m_fileNames) {
-      m_readers.emplace_back(podio::makeReader(names));
-      m_numberOfEntries.push_back(m_readers.back().getEntries("events"));
+    for (size_t group = 0; group < m_fileNames.size(); ++group) {
+      const auto& names = m_fileNames[group];
+      if (m_oneEntryPerFile[group]) {
+        m_readers.emplace_back();
+        m_numberOfEntries.push_back(names.size());
+      } else {
+        auto reader = std::make_unique<podio::Reader>(podio::makeReader(names));
+        m_numberOfEntries.push_back(reader->getEntries("events"));
+        m_readers.push_back(std::move(reader));
+      }
     }
     ready.set_value();
   } catch (...) {
@@ -158,7 +166,13 @@ void EventReader::run(std::promise<void> ready) {
     }
 
     try {
-      request.promise.set_value(m_readers.at(request.groupIndex).readEvent(request.entryIndex));
+      if (m_oneEntryPerFile.at(request.groupIndex)) {
+        const auto& filename = m_fileNames.at(request.groupIndex).at(request.entryIndex);
+        auto reader = podio::makeReader(filename);
+        request.promise.set_value(reader.readEvent(0));
+      } else {
+        request.promise.set_value(m_readers.at(request.groupIndex)->readEvent(request.entryIndex));
+      }
     } catch (...) {
       request.promise.set_exception(std::current_exception());
     }
@@ -206,11 +220,14 @@ StatusCode OverlayTimingRandomEntryMix::initialize() {
   if (m_allowReusingEntries.empty()) {
     m_allowReusingEntries = std::vector<bool>(numberOfGroups, false);
   }
+  if (m_oneEntryPerFile.empty()) {
+    m_oneEntryPerFile = std::vector<bool>(numberOfGroups, false);
+  }
 
   if (m_numberBackground.size() != numberOfGroups || m_poisson.size() != numberOfGroups ||
-      m_allowReusingEntries.size() != numberOfGroups) {
-    error() << "NumberBackground, Poisson_random_NOverlay and AllowReusingBackgroundEntries must each have one "
-               "value per background group"
+      m_allowReusingEntries.size() != numberOfGroups || m_oneEntryPerFile.size() != numberOfGroups) {
+    error() << "NumberBackground, Poisson_random_NOverlay, AllowReusingBackgroundEntries and "
+               "OneEntryPerFile must each have one value per background group"
             << endmsg;
     return StatusCode::FAILURE;
   }
@@ -254,7 +271,8 @@ StatusCode OverlayTimingRandomEntryMix::initialize() {
       }
       inputFiles.push_back(std::move(files));
     }
-    m_backgroundEvents = std::make_unique<OverlayTimingRandomEntryMixNS::EventReader>(std::move(inputFiles));
+    m_backgroundEvents = std::make_unique<OverlayTimingRandomEntryMixNS::EventReader>(
+        std::move(inputFiles), m_oneEntryPerFile.value());
   } catch (const std::exception& exception) {
     error() << "Could not open background input: " << exception.what() << endmsg;
     return StatusCode::FAILURE;

@@ -23,6 +23,9 @@
     background group is treated as a flat collection of EDM4hep event entries,
     independent of how those entries are distributed over files.
 
+    Groups configured with OneEntryPerFile instead sample files directly and
+    read entry zero from each selected file.
+
     The MCParticleCollection in signal and background are overlaid into one
     collection. SimTrackerHit collections are cropped and overlaid if they are
     in the time window. SimCalorimeterHit collections are overlaid based on the
@@ -70,7 +73,8 @@ struct EventReader {
     std::promise<podio::Frame> promise;
   };
 
-  explicit EventReader(std::vector<std::vector<std::string>> fileNames);
+  EventReader(std::vector<std::vector<std::string>> fileNames,
+              std::vector<bool> oneEntryPerFile);
   ~EventReader();
 
   podio::Frame read(size_t groupIndex, size_t entryIndex);
@@ -81,7 +85,8 @@ private:
   void run(std::promise<void> ready);
 
   std::vector<std::vector<std::string>> m_fileNames;
-  std::vector<podio::Reader> m_readers;
+  std::vector<bool> m_oneEntryPerFile;
+  std::vector<std::unique_ptr<podio::Reader>> m_readers;
   std::vector<size_t> m_numberOfEntries;
 
   std::queue<Request> m_requests;
@@ -143,6 +148,9 @@ private:
       "AllowReusingBackgroundEntries",
       {},
       "Allow entries in each group to be selected more than once in one bunch crossing"};
+  Gaudi::Property<std::vector<bool>> m_oneEntryPerFile{
+      this, "OneEntryPerFile", {},
+      "Treat each file in a group as one background entry without inspecting its contents"};
 
   // Collection handling shared with OverlayTimingRandomMix.
   Gaudi::Property<std::string> m_MCParticleCollectionName{this, "BackgroundMCParticleCollectionName", "MCParticle",
