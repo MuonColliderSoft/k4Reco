@@ -271,8 +271,8 @@ StatusCode OverlayTimingRandomEntryMix::initialize() {
       }
       inputFiles.push_back(std::move(files));
     }
-    m_backgroundEvents = std::make_unique<OverlayTimingRandomEntryMixNS::EventReader>(
-        std::move(inputFiles), m_oneEntryPerFile.value());
+    m_backgroundEvents =
+        std::make_unique<OverlayTimingRandomEntryMixNS::EventReader>(std::move(inputFiles), m_oneEntryPerFile.value());
   } catch (const std::exception& exception) {
     error() << "Could not open background input: " << exception.what() << endmsg;
     return StatusCode::FAILURE;

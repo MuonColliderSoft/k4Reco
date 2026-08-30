@@ -73,8 +73,7 @@ struct EventReader {
     std::promise<podio::Frame> promise;
   };
 
-  EventReader(std::vector<std::vector<std::string>> fileNames,
-              std::vector<bool> oneEntryPerFile);
+  EventReader(std::vector<std::vector<std::string>> fileNames, std::vector<bool> oneEntryPerFile);
   ~EventReader();
 
   podio::Frame read(size_t groupIndex, size_t entryIndex);
@@ -149,7 +148,9 @@ private:
       {},
       "Allow entries in each group to be selected more than once in one bunch crossing"};
   Gaudi::Property<std::vector<bool>> m_oneEntryPerFile{
-      this, "OneEntryPerFile", {},
+      this,
+      "OneEntryPerFile",
+      {},
       "Treat each file in a group as one background entry without inspecting its contents"};
 
   // Collection handling shared with OverlayTimingRandomMix.
